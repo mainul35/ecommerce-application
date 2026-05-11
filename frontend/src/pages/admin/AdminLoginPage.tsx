@@ -60,14 +60,16 @@ export function AdminLoginPage() {
             </div>
           )}
 
-          <form onSubmit={submit}>
+          <form onSubmit={submit} noValidate>
             <div className="mb-3">
-              <label htmlFor="adminEmail" className="form-label">
+              <label htmlFor="adminIdentifier" className="form-label">
                 Username or email
               </label>
               <input
                 type="text"
-                id="adminEmail"
+                inputMode="text"
+                id="adminIdentifier"
+                name="username"
                 className="form-control"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
