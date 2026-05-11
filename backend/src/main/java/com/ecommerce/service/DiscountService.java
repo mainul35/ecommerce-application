@@ -24,8 +24,12 @@ import java.util.UUID;
  * Resolves discounts to effective product pricing and exposes admin CRUD.
  *
  * Resolution rule when multiple active discounts apply to the same product:
- * the one yielding the LARGEST absolute saving wins. No stacking - keeps
- * reasoning simple and prevents overlapping campaigns from compounding.
+ * the MOST SPECIFIC scope wins - PRODUCT beats CATEGORY beats SITEWIDE,
+ * regardless of value. Within the SITEWIDE tier (where multiple discounts
+ * can coexist), the largest absolute saving wins as a tiebreak. Per-product
+ * and per-category discounts are constrained to 1 by the
+ * uq_discount_scope_target unique index, so no tiebreak is needed there.
+ * No stacking across tiers - the winning discount is the sole price modifier.
  *
  * The discounts table is intentionally small (campaigns, not per-row), so
  * the active set is loaded once per product-list request and matched in
@@ -57,6 +61,41 @@ public class DiscountService {
         return discountRepository
                 .findByScopeAndScopeTargetIdOrderByCreatedAtDesc(scope, scopeTargetId)
                 .map(discountMapper::toDto);
+    }
+
+    /**
+     * Every ACTIVE discount that could affect the given product right now:
+     * the direct PRODUCT-scope discount, the CATEGORY-scope discount on its
+     * category (if any), and all SITEWIDE discounts. Used by the inline
+     * panel so admins see exactly the discounts the storefront resolves
+     * against, not just the ones directly targeting this product.
+     */
+    public Flux<DiscountDto> findApplicableToProduct(Product product) {
+        return findActive()
+                .filter(d -> appliesTo(d, product))
+                .sort((a, b) -> Integer.compare(scopeOrder(a.getScope()), scopeOrder(b.getScope())))
+                .map(discountMapper::toDto);
+    }
+
+    /**
+     * Every ACTIVE discount that could affect products in this category:
+     * the CATEGORY-scope discount on this category (if any), plus SITEWIDE.
+     */
+    public Flux<DiscountDto> findApplicableToCategory(UUID categoryId) {
+        return findActive()
+                .filter(d -> d.getScope() == Discount.DiscountScope.SITEWIDE
+                        || (d.getScope() == Discount.DiscountScope.CATEGORY
+                                && categoryId.equals(d.getScopeTargetId())))
+                .sort((a, b) -> Integer.compare(scopeOrder(a.getScope()), scopeOrder(b.getScope())))
+                .map(discountMapper::toDto);
+    }
+
+    private static int scopeOrder(Discount.DiscountScope s) {
+        return switch (s) {
+            case PRODUCT  -> 0;
+            case CATEGORY -> 1;
+            case SITEWIDE -> 2;
+        };
     }
 
     public Mono<DiscountDto> findById(UUID id) {
@@ -122,25 +161,54 @@ public class DiscountService {
     }
 
     /**
-     * Pick the discount that maximises savings on this product. Returns
-     * empty when nothing applies.
+     * Pick the discount that applies to this product. Resolution rule:
+     * <strong>most-specific scope wins</strong> - PRODUCT beats CATEGORY beats
+     * SITEWIDE. Within the SITEWIDE tier (the only tier where multiple
+     * entries can coexist; PRODUCT/CATEGORY are constrained to 1 by the
+     * uq_discount_scope_target unique index) the largest absolute saving
+     * wins as a tiebreak.
+     * <p>
+     * Rationale: an admin who sets a discount directly on a product
+     * expects it to apply, regardless of a broader campaign's value. Most
+     * e-commerce platforms work this way.
      */
     public Optional<DiscountResult> bestFor(Product product, List<Discount> activeDiscounts) {
-        DiscountResult best = null;
+        Discount productScope = null;
+        Discount categoryScope = null;
+        Discount bestSitewide = null;
+        BigDecimal bestSitewideAmount = BigDecimal.ZERO;
+
         for (Discount d : activeDiscounts) {
             if (!appliesTo(d, product)) continue;
             BigDecimal amount = computeAmount(d, product.getPrice());
             if (amount.compareTo(BigDecimal.ZERO) <= 0) continue;
-            if (best == null || amount.compareTo(best.getAmount()) > 0) {
-                BigDecimal effective = product.getPrice().subtract(amount).max(BigDecimal.ZERO);
-                BigDecimal pct = product.getPrice().compareTo(BigDecimal.ZERO) > 0
-                        ? amount.multiply(BigDecimal.valueOf(100))
-                                .divide(product.getPrice(), 2, RoundingMode.HALF_UP)
-                        : BigDecimal.ZERO;
-                best = new DiscountResult(d.getId(), d.getName(), amount, effective, pct, d.getEndsAt());
+
+            switch (d.getScope()) {
+                case PRODUCT  -> productScope = d;
+                case CATEGORY -> categoryScope = d;
+                case SITEWIDE -> {
+                    if (amount.compareTo(bestSitewideAmount) > 0) {
+                        bestSitewide = d;
+                        bestSitewideAmount = amount;
+                    }
+                }
             }
         }
-        return Optional.ofNullable(best);
+
+        Discount winner = productScope != null ? productScope
+                : categoryScope != null ? categoryScope
+                : bestSitewide;
+        if (winner == null) return Optional.empty();
+        return Optional.of(buildResult(winner, product.getPrice()));
+    }
+
+    private DiscountResult buildResult(Discount d, BigDecimal price) {
+        BigDecimal amount = computeAmount(d, price);
+        BigDecimal effective = price.subtract(amount).max(BigDecimal.ZERO);
+        BigDecimal pct = price.compareTo(BigDecimal.ZERO) > 0
+                ? amount.multiply(BigDecimal.valueOf(100)).divide(price, 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        return new DiscountResult(d.getId(), d.getName(), amount, effective, pct, d.getEndsAt());
     }
 
     private boolean appliesTo(Discount d, Product p) {

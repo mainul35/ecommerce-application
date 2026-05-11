@@ -2,6 +2,8 @@ package com.ecommerce.admin.controller;
 
 import com.ecommerce.dto.DiscountDto;
 import com.ecommerce.model.Discount;
+import com.ecommerce.exception.ResourceNotFoundException;
+import com.ecommerce.repository.ProductRepository;
 import com.ecommerce.service.DiscountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +36,7 @@ import java.util.UUID;
 public class AdminDiscountController {
 
     private final DiscountService discountService;
+    private final ProductRepository productRepository;
 
     @GetMapping
     @Operation(summary = "List discounts (newest first). Optionally filter by scope + scopeTargetId.")
@@ -44,6 +47,22 @@ public class AdminDiscountController {
             return discountService.listForScopeTarget(scope, scopeTargetId);
         }
         return discountService.listAll();
+    }
+
+    @GetMapping("/applicable-to-product/{productId}")
+    @Operation(summary = "List all active discounts that apply to this product right now "
+            + "(PRODUCT-scope on the product, CATEGORY-scope on its category, plus SITEWIDE)")
+    public Flux<DiscountDto> applicableToProduct(@PathVariable UUID productId) {
+        return productRepository.findById(productId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Product not found")))
+                .flatMapMany(discountService::findApplicableToProduct);
+    }
+
+    @GetMapping("/applicable-to-category/{categoryId}")
+    @Operation(summary = "List all active discounts that apply to products in this category "
+            + "(CATEGORY-scope on the category, plus SITEWIDE)")
+    public Flux<DiscountDto> applicableToCategory(@PathVariable UUID categoryId) {
+        return discountService.findApplicableToCategory(categoryId);
     }
 
     @GetMapping("/{id}")

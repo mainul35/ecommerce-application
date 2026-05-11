@@ -3,9 +3,10 @@
 -- Effective price is computed at read time (no denormalised columns to keep in sync).
 --
 -- Resolution rule when multiple active discounts apply to the same product:
--- the BEST one for the customer wins (highest absolute savings). Stacking
--- across discounts is intentionally not supported - keeps reasoning simple
--- and prevents accidentally giving away the store with overlapping campaigns.
+-- the MOST SPECIFIC scope wins - PRODUCT beats CATEGORY beats SITEWIDE,
+-- regardless of value. Stacking across tiers is intentionally not supported
+-- - keeps reasoning simple and prevents accidentally giving away the store
+-- with overlapping campaigns. Within SITEWIDE, the largest saving wins.
 
 CREATE TABLE discounts (
     id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
