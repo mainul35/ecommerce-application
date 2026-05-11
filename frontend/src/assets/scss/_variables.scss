@@ -1,0 +1,55 @@
+// Custom Bootstrap Variables Override
+// These variables override Bootstrap's defaults before importing Bootstrap
+
+// Colors
+$primary: #2563eb;
+$secondary: #64748b;
+$success: #22c55e;
+$info: #0ea5e9;
+$warning: #f59e0b;
+$danger: #ef4444;
+$light: #f8fafc;
+$dark: #1e293b;
+
+// Typography
+$font-family-sans-serif: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+$font-size-base: 1rem;
+$line-height-base: 1.6;
+
+// Spacing
+$spacer: 1rem;
+
+// Border radius
+$border-radius: 0.5rem;
+$border-radius-sm: 0.25rem;
+$border-radius-lg: 0.75rem;
+
+// Shadows
+$box-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+$box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+$box-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+// Container
+$container-max-widths: (
+  sm: 540px,
+  md: 720px,
+  lg: 960px,
+  xl: 1140px,
+  xxl: 1320px
+);
+
+// Grid
+$grid-gutter-width: 1.5rem;
+
+// Navbar
+$navbar-padding-y: 1rem;
+$navbar-nav-link-padding-x: 1rem;
+
+// Cards
+$card-border-radius: $border-radius-lg;
+$card-box-shadow: $box-shadow;
+
+// Buttons
+$btn-padding-y: 0.625rem;
+$btn-padding-x: 1.25rem;
+$btn-border-radius: $border-radius;

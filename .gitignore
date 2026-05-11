@@ -1,0 +1,42 @@
+# Backend
+backend/target/
+backend/.mvn/
+backend/HELP.md
+*.class
+*.jar
+*.war
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Claude metadata
+.claude/
+
+# Stray Windows-reserved "nul" files left over by redirected commands
+nul
+**/nul

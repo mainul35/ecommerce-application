@@ -1,0 +1,175 @@
+// Custom Component Styles
+
+@use 'sass:color';
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Product Card
+.product-card {
+  @include card-hover;
+  border: none;
+
+  .product-image {
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: $border-radius-lg $border-radius-lg 0 0;
+  }
+
+  .product-title {
+    @include truncate(2);
+    font-weight: 600;
+    min-height: 3rem;
+  }
+
+  .product-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $primary;
+  }
+
+  .product-original-price {
+    text-decoration: line-through;
+    color: $secondary;
+    font-size: 0.875rem;
+  }
+}
+
+// Hero Section
+.hero-section {
+  padding: 4rem 0;
+  background: linear-gradient(135deg, $primary 0%, color.adjust($primary, $lightness: -15%) 100%);
+  color: white;
+
+  @media (min-width: 768px) {
+    padding: 6rem 0;
+  }
+
+  .hero-title {
+    font-weight: 800;
+    line-height: 1.2;
+  }
+
+  .hero-subtitle {
+    opacity: 0.9;
+    font-size: 1.125rem;
+  }
+}
+
+// Cart Item
+.cart-item {
+  padding: 1rem;
+  border-bottom: 1px solid $light;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .cart-item-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: $border-radius;
+  }
+
+  .quantity-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
+    }
+  }
+}
+
+// Loading Spinner
+.loading-spinner {
+  @include flex-center;
+  min-height: 200px;
+
+  .spinner-border {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+// Empty State
+.empty-state {
+  @include flex-center;
+  flex-direction: column;
+  padding: 3rem;
+  text-align: center;
+
+  .empty-state-icon {
+    font-size: 4rem;
+    color: $secondary;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state-text {
+    color: $secondary;
+    margin-bottom: 1.5rem;
+  }
+}
+
+// Form Styles
+.auth-form {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: white;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow-lg;
+
+  .auth-form-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+}
+
+// Badge custom
+.badge-discount {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: $danger;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: $border-radius-sm;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+// Category Image
+.category-image {
+  max-height: 100px;
+  object-fit: contain;
+}
+
+// Navbar custom
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: $danger;
+  color: white;
+  font-size: 0.75rem;
+  @include flex-center;
+}

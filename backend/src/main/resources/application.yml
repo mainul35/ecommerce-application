@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: ecommerce-platform
+
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ecommerce}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    pool:
+      enabled: true
+      initial-size: 5
+      max-size: 20
+      max-idle-time: 30m
+
+  flyway:
+    enabled: true
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ecommerce}
+    user: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    root: INFO
+    com.ecommerce: DEBUG
+    org.springframework.r2dbc: DEBUG
+
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-for-jwt-signing-must-be-at-least-32-characters}
+  expiration: ${JWT_EXPIRATION:86400000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000}
+  allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+
+# Stock reservation: how long a PENDING order holds stock before auto-cancel.
+reservation:
+  ttl-hours: ${RESERVATION_TTL_HOURS:168}            # 7 days
+  cleanup-interval-ms: ${RESERVATION_CLEANUP_MS:300000}  # 5 minutes
+  cleanup-initial-delay-ms: 60000
+
+# Stripe payment integration. Replace placeholders with sk_test_... and whsec_... keys.
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_PLACEHOLDER_REPLACE_VIA_ENV}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_PLACEHOLDER_REPLACE_VIA_ENV}
+  success-url: ${STRIPE_SUCCESS_URL:http://localhost:5174/checkout/success?orderId={CHECKOUT_SESSION_ID}}
+  cancel-url:  ${STRIPE_CANCEL_URL:http://localhost:5174/checkout/cancel?orderId={CHECKOUT_SESSION_ID}}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  show-actuator: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  r2dbc:
+    url: r2dbc:h2:mem:///testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  flyway:
+    enabled: false

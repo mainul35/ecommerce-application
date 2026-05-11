@@ -1,0 +1,128 @@
+// Main SCSS file for E-Commerce Platform
+
+@use 'variables' as *;
+
+@use 'bootstrap/scss/bootstrap' with (
+  $primary: $primary,
+  $secondary: $secondary,
+  $success: $success,
+  $info: $info,
+  $warning: $warning,
+  $danger: $danger,
+  $light: $light,
+  $dark: $dark,
+  $font-family-sans-serif: $font-family-sans-serif,
+  $font-size-base: $font-size-base,
+  $line-height-base: $line-height-base,
+  $spacer: $spacer,
+  $border-radius: $border-radius,
+  $border-radius-sm: $border-radius-sm,
+  $border-radius-lg: $border-radius-lg,
+  $box-shadow-sm: $box-shadow-sm,
+  $box-shadow: $box-shadow,
+  $box-shadow-lg: $box-shadow-lg,
+  $container-max-widths: $container-max-widths,
+  $grid-gutter-width: $grid-gutter-width,
+  $navbar-padding-y: $navbar-padding-y,
+  $navbar-nav-link-padding-x: $navbar-nav-link-padding-x,
+  $card-border-radius: $card-border-radius,
+  $card-box-shadow: $card-box-shadow,
+  $btn-padding-y: $btn-padding-y,
+  $btn-padding-x: $btn-padding-x,
+  $btn-border-radius: $btn-border-radius
+);
+
+@use 'components';
+
+// 5. Global styles
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
+// Utility classes
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.transition-all {
+  transition: all 0.2s ease;
+}
+
+// Image responsive
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+// Links
+a {
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+// Buttons enhancement
+.btn {
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+// Container fluid with padding
+.container-fluid-custom {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+
+  @media (min-width: 768px) {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+// Section spacing
+.section {
+  padding: 3rem 0;
+
+  @media (min-width: 768px) {
+    padding: 5rem 0;
+  }
+}
+
+// Footer
+.footer {
+  background: $dark;
+  color: white;
+  padding: 3rem 0 1.5rem;
+  margin-top: auto;
+
+  a {
+    color: rgba(255, 255, 255, 0.7);
+
+    &:hover {
+      color: white;
+    }
+  }
+
+  .footer-title {
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: white;
+  }
+}
