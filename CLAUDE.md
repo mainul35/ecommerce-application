@@ -27,6 +27,7 @@
 - **No Raw SQL:** Use Spring Data R2DBC or QueryDSL to prevent SQL Injection.
 - **No ThreadLocal:** Do not rely on `ThreadLocal` (e.g., standard SecurityContext) as it is incompatible with the Reactive event-loop.
 - **No New Flyway Migrations Per Change:** Do not generate a new Flyway migration SQL file for every schema change. Update the existing migration file instead, and only create a new versioned migration when the previous one has already been applied to a shared/production environment.
+- **No Co-Authored-By Trailer in Commits:** Do not add a `Co-Authored-By: Claude ...` trailer (or any AI-attribution trailer) to commit messages. Commits should attribute only the human author.
 
 ## 🎨 Frontend & Design Standards
 - **Responsiveness:** Test all components across breakpoints (xs, sm, md, lg, xl).
