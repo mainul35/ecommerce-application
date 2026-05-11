@@ -1,28 +1,37 @@
 import { NavLink } from 'react-router-dom';
+import { useAppSelector } from '../../../store';
+import { canManageManagers, canManagePromotions, canManageOrders } from '../../../routes/permissions';
 
 interface NavItem {
   to: string;
   label: string;
   icon: string;
   end?: boolean;
+  /** Returns true if the current user should see this item. */
+  visibleFor: (visible: { isAdminUser: boolean }) => boolean;
 }
 
 const navItems: NavItem[] = [
-  { to: '/admin', label: 'Dashboard', icon: 'bi-speedometer2', end: true },
-  { to: '/admin/categories', label: 'Categories', icon: 'bi-tags' },
-  { to: '/admin/products', label: 'Products', icon: 'bi-box-seam' },
-  { to: '/admin/discounts', label: 'Discounts', icon: 'bi-tag' },
-  { to: '/admin/discount-templates', label: 'Templates', icon: 'bi-bookmark' },
-  { to: '/admin/coupons', label: 'Coupons', icon: 'bi-ticket-perforated' },
-  { to: '/admin/orders', label: 'Orders', icon: 'bi-receipt' },
-  { to: '/admin/settings', label: 'Settings', icon: 'bi-gear' },
+  { to: '/admin', label: 'Dashboard', icon: 'bi-speedometer2', end: true, visibleFor: () => true },
+  { to: '/admin/categories', label: 'Categories', icon: 'bi-tags', visibleFor: () => true },
+  { to: '/admin/products', label: 'Products', icon: 'bi-box-seam', visibleFor: () => true },
+  { to: '/admin/discounts', label: 'Discounts', icon: 'bi-tag', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/discount-templates', label: 'Templates', icon: 'bi-bookmark', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/coupons', label: 'Coupons', icon: 'bi-ticket-perforated', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/orders', label: 'Orders', icon: 'bi-receipt', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/managers', label: 'Managers', icon: 'bi-people', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/settings', label: 'Settings', icon: 'bi-gear', visibleFor: () => true },
 ];
 
 /**
  * AdminLTE 4 sidebar. Uses the standard `.app-sidebar > .sidebar-brand + .sidebar-wrapper` markup.
- * Active link styling is delegated to NavLink + AdminLTE's `.nav-sidebar .active` rule.
+ * Items are filtered by capability so managers see only what they can act on.
  */
 export function AdminSidebar() {
+  const { user } = useAppSelector((state) => state.auth);
+  const isAdminUser =
+    canManageManagers(user) && canManagePromotions(user) && canManageOrders(user);
+
   return (
     <aside className="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
       <div className="sidebar-brand">
@@ -35,18 +44,20 @@ export function AdminSidebar() {
       <div className="sidebar-wrapper">
         <nav className="mt-2">
           <ul className="nav sidebar-menu flex-column" data-lte-toggle="treeview" data-accordion="false">
-            {navItems.map((item) => (
-              <li key={item.to} className="nav-item">
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <i className={`nav-icon bi ${item.icon}`}></i>
-                  <p>{item.label}</p>
-                </NavLink>
-              </li>
-            ))}
+            {navItems
+              .filter((item) => item.visibleFor({ isAdminUser }))
+              .map((item) => (
+                <li key={item.to} className="nav-item">
+                  <NavLink
+                    to={item.to}
+                    end={item.end}
+                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  >
+                    <i className={`nav-icon bi ${item.icon}`}></i>
+                    <p>{item.label}</p>
+                  </NavLink>
+                </li>
+              ))}
           </ul>
         </nav>
       </div>

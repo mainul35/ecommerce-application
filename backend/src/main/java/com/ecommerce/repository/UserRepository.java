@@ -23,4 +23,7 @@ public interface UserRepository extends R2dbcRepository<User, UUID> {
            "  LOWER(last_name)  LIKE LOWER(CONCAT('%', :q, '%'))" +
            ") ORDER BY email LIMIT 20")
     Flux<User> searchCustomers(String q);
+
+    @Query("SELECT * FROM users WHERE role = 'MANAGER' ORDER BY created_at DESC")
+    Flux<User> findAllManagers();
 }

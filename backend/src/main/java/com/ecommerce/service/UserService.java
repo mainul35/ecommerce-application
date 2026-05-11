@@ -2,6 +2,7 @@ package com.ecommerce.service;
 
 import com.ecommerce.model.User;
 import com.ecommerce.dto.AdminProfileUpdateRequest;
+import com.ecommerce.dto.ManagerCreateRequest;
 import com.ecommerce.dto.UserDto;
 import com.ecommerce.dto.auth.AuthResponse;
 import com.ecommerce.dto.auth.LoginRequest;
@@ -15,6 +16,7 @@ import com.ecommerce.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -56,11 +58,15 @@ public class UserService {
     }
 
     /**
-     * Admin-side login. Rejects non-ADMIN users with the same generic message
-     * (no information leak about whether the account exists or is a customer).
+     * Admin-console login. Accepts both ADMIN and MANAGER accounts - they
+     * share the same login surface but see different sidebars / route
+     * permissions once inside. Rejects everyone else with the same generic
+     * message (no information leak about whether the account exists or
+     * is a customer).
      */
     public Mono<AuthResponse> adminLogin(LoginRequest request) {
-        return authenticate(request, role -> role == User.UserRole.ADMIN);
+        return authenticate(request,
+                role -> role == User.UserRole.ADMIN || role == User.UserRole.MANAGER);
     }
 
     private Mono<AuthResponse> authenticate(LoginRequest request,
@@ -97,6 +103,56 @@ public class UserService {
     public Mono<User> findUserEntityByEmail(String email) {
         return userRepository.findByEmail(email)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(USER_NOT_FOUND)));
+    }
+
+    // ---------- Manager (limited-admin) management ----------
+
+    public Flux<UserDto> listManagers() {
+        return userRepository.findAllManagers().map(userMapper::toDto);
+    }
+
+    /**
+     * Admin provisions a new MANAGER account. The email/username must be unique
+     * across all users. The manager can sign in immediately at /admin/login.
+     */
+    public Mono<UserDto> createManager(ManagerCreateRequest request) {
+        return userRepository.existsByEmail(request.getEmail())
+                .flatMap(exists -> {
+                    if (Boolean.TRUE.equals(exists)) {
+                        return Mono.error(new BadRequestException("Email or username already in use"));
+                    }
+                    User manager = User.builder()
+                            .email(request.getEmail())
+                            .password(passwordEncoder.encode(request.getPassword()))
+                            .firstName(request.getFirstName())
+                            .lastName(request.getLastName())
+                            .role(User.UserRole.MANAGER)
+                            .isActive(true)
+                            .emailVerified(true)
+                            .build();
+                    manager.setId(UUID.randomUUID());
+                    return userRepository.save(manager);
+                })
+                .map(userMapper::toDto);
+    }
+
+    /**
+     * Block / unblock a manager (toggles the user's isActive flag). Blocked
+     * managers cannot log in to the admin console. Refuses to touch any
+     * non-MANAGER account to prevent admins from accidentally locking
+     * themselves or other admins out via this surface.
+     */
+    public Mono<UserDto> setManagerActive(UUID managerId, boolean active) {
+        return userRepository.findById(managerId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(USER_NOT_FOUND)))
+                .flatMap(user -> {
+                    if (user.getRole() != User.UserRole.MANAGER) {
+                        return Mono.error(new BadRequestException("Target user is not a manager"));
+                    }
+                    user.setIsActive(active);
+                    return userRepository.save(user);
+                })
+                .map(userMapper::toDto);
     }
 
     /**

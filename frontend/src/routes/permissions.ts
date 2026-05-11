@@ -16,11 +16,27 @@ export const hasRole = (user: User | null, role: UserRole): boolean =>
 
 export const isAdmin = (user: User | null): boolean => hasRole(user, 'ADMIN');
 
+export const isManager = (user: User | null): boolean => hasRole(user, 'MANAGER');
+
 export const isVendor = (user: User | null): boolean => hasRole(user, 'VENDOR');
 
-export const canAccessAdmin = (user: User | null): boolean => isAdmin(user);
+/** Any staff role - can sign in to the admin console. */
+export const canAccessAdmin = (user: User | null): boolean =>
+  isAdmin(user) || isManager(user);
 
+// ---------- Capability checks (admin console actions) ----------
+
+/** Products: admin and manager can both manage. */
 export const canManageProducts = (user: User | null): boolean =>
-  isAdmin(user) || isVendor(user);
+  isAdmin(user) || isManager(user);
 
-export const canManageCategories = (user: User | null): boolean => isAdmin(user);
+/** Categories: admin and manager can both manage. */
+export const canManageCategories = (user: User | null): boolean =>
+  isAdmin(user) || isManager(user);
+
+/** Discounts / coupons / templates / orders / customers: admin only. */
+export const canManagePromotions = (user: User | null): boolean => isAdmin(user);
+export const canManageOrders = (user: User | null): boolean => isAdmin(user);
+
+/** Provisioning new managers, blocking them: admin only. */
+export const canManageManagers = (user: User | null): boolean => isAdmin(user);

@@ -40,6 +40,9 @@ public class User extends BaseEntity {
     public enum UserRole {
         CUSTOMER,
         ADMIN,
+        /** Limited admin: can manage products and categories. Cannot manage other staff,
+         * discounts, coupons, orders, or settings beyond their own profile. */
+        MANAGER,
         VENDOR
     }
 }

@@ -19,6 +19,7 @@ public class UserDto {
     private String firstName;
     private String lastName;
     private User.UserRole role;
+    private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -7,11 +7,12 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export type UserRole = 'CUSTOMER' | 'ADMIN' | 'VENDOR';
+export type UserRole = 'CUSTOMER' | 'ADMIN' | 'MANAGER' | 'VENDOR';
 
 export interface AuthState {
   user: User | null;
