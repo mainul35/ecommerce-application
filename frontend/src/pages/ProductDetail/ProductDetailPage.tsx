@@ -60,12 +60,10 @@ export function ProductDetailPage() {
   const images = product.images.length > 0 ? product.images : [product.imageUrl];
   const hasDiscount = typeof product.discountedPrice === 'number';
   const effectivePrice = hasDiscount ? product.discountedPrice! : product.price;
-  const compareAtPrice = hasDiscount ? product.price : product.originalPrice;
+  const compareAtPrice = hasDiscount ? product.price : null;
   const discountPercentage = hasDiscount
     ? Math.round(Number(product.discountPercent ?? 0))
-    : product.originalPrice
-      ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-      : null;
+    : null;
 
   return (
     <div className="container py-5">

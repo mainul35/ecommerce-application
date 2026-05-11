@@ -5,7 +5,6 @@ export interface ProductUpsertRequest {
   name: string;
   description?: string;
   price: number;
-  originalPrice?: number;
   imageUrl?: string;
   images?: string[];
   categoryId: string;

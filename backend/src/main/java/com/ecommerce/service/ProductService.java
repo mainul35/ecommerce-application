@@ -100,7 +100,6 @@ public class ProductService {
                     existing.setName(request.getName());
                     existing.setDescription(request.getDescription());
                     existing.setPrice(request.getPrice());
-                    existing.setOriginalPrice(request.getOriginalPrice());
                     existing.setImageUrl(request.getImageUrl());
                     existing.setCategoryId(request.getCategoryId());
                     existing.setStock(request.getStock());

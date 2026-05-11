@@ -27,8 +27,6 @@ public class ProductCreateRequest {
     @DecimalMin(value = "0.01", message = "Price must be greater than 0")
     private BigDecimal price;
 
-    private BigDecimal originalPrice;
-
     private String imageUrl;
 
     private List<String> images;

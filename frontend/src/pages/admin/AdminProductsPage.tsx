@@ -13,7 +13,6 @@ const emptyForm: ProductUpsertRequest = {
   name: '',
   description: '',
   price: 0,
-  originalPrice: undefined,
   imageUrl: '',
   categoryId: '',
   attributes: {},
@@ -69,7 +68,6 @@ export function AdminProductsPage() {
       name: p.name,
       description: p.description ?? '',
       price: p.price,
-      originalPrice: p.originalPrice,
       imageUrl: p.imageUrl ?? '',
       categoryId: p.category?.id ?? '',
       attributes: p.attributes ?? {},
@@ -169,7 +167,7 @@ export function AdminProductsPage() {
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
                 </div>
-                <div className="col-6 col-md-3">
+                <div className="col-12 col-md-4">
                   <label className="form-label">Price</label>
                   <input
                     type="number"
@@ -181,23 +179,7 @@ export function AdminProductsPage() {
                     required
                   />
                 </div>
-                <div className="col-6 col-md-3">
-                  <label className="form-label">Original price</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="form-control"
-                    value={form.originalPrice ?? ''}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        originalPrice: e.target.value === '' ? undefined : Number(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-                <div className="col-6 col-md-3">
+                <div className="col-6 col-md-4">
                   <label className="form-label">Stock</label>
                   <input
                     type="number"
@@ -208,7 +190,7 @@ export function AdminProductsPage() {
                     required
                   />
                 </div>
-                <div className="col-6 col-md-3">
+                <div className="col-6 col-md-4">
                   <label className="form-label">Category</label>
                   <select
                     className="form-select"

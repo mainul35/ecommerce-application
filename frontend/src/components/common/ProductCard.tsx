@@ -25,17 +25,13 @@ export function ProductCard({ product }: ProductCardProps) {
     );
   };
 
-  // Live discount (from a campaign) takes precedence over the static originalPrice anchor.
+  // Sale-price display is driven entirely by active discount campaigns.
   const hasDiscount = typeof product.discountedPrice === 'number';
   const effectivePrice = hasDiscount ? product.discountedPrice! : product.price;
-  const compareAtPrice = hasDiscount
-    ? product.price
-    : product.originalPrice;
+  const compareAtPrice = hasDiscount ? product.price : null;
   const discountPercentage = hasDiscount
     ? Math.round(Number(product.discountPercent ?? 0))
-    : product.originalPrice
-      ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-      : null;
+    : null;
 
   return (
     <div className="card product-card h-100">

@@ -28,9 +28,6 @@ public class Product extends BaseEntity {
     @Column("price")
     private BigDecimal price;
 
-    @Column("original_price")
-    private BigDecimal originalPrice;
-
     @Column("image_url")
     private String imageUrl;
 

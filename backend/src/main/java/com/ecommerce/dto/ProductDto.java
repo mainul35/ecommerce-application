@@ -20,7 +20,6 @@ public class ProductDto {
     private String name;
     private String description;
     private BigDecimal price;
-    private BigDecimal originalPrice;
     private String imageUrl;
     private List<String> images;
     private CategoryDto category;
