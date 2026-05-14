@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAppDispatch } from '../../store';
 import { addToCart } from '../../store/slices/cartSlice';
 import { addNotification } from '../../store/slices/uiSlice';
+import { useCurrency } from '../../storefront/CurrencyContext';
 import type { Product } from '../../types';
 
 interface ProductCardProps {
@@ -10,6 +11,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const dispatch = useAppDispatch();
+  const { format } = useCurrency();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -56,11 +58,9 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
           <div className="mt-auto">
             <div className="d-flex align-items-center gap-2 mb-3">
-              <span className="product-price">${effectivePrice.toFixed(2)}</span>
+              <span className="product-price">{format(effectivePrice)}</span>
               {compareAtPrice && compareAtPrice > effectivePrice && (
-                <span className="product-original-price">
-                  ${compareAtPrice.toFixed(2)}
-                </span>
+                <span className="product-original-price">{format(compareAtPrice)}</span>
               )}
             </div>
             <button

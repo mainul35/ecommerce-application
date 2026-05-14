@@ -3,6 +3,7 @@ import { useAppSelector, useAppDispatch } from '../../store';
 import { selectCartItemCount } from '../../store/slices/cartSlice';
 import { logout } from '../../store/slices/authSlice';
 import { canAccessAdmin } from '../../routes/permissions';
+import { CurrencyPicker } from '../../storefront/CurrencyPicker';
 
 export function Navbar() {
   const dispatch = useAppDispatch();
@@ -60,6 +61,8 @@ export function Navbar() {
                 aria-label="Search"
               />
             </form>
+
+            <CurrencyPicker />
 
             <Link
               to="/cart"

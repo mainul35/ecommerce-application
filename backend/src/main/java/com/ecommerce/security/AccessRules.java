@@ -48,6 +48,10 @@ public class AccessRules {
                 .pathMatchers("/api/admin/auth/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                // Currencies and regions: storefront needs them anonymously to render
+                // prices and to map detected country -> region/currency.
+                .pathMatchers(HttpMethod.GET, "/api/currencies/**").permitAll()
+                .pathMatchers(HttpMethod.GET, "/api/regions/**").permitAll()
                 // Stripe webhook is public but signature-verified inside the handler.
                 .pathMatchers(HttpMethod.POST, "/api/webhooks/stripe").permitAll()
                 // ADMIN-only sub-surfaces (must come BEFORE the staff-shared rules so

@@ -19,6 +19,8 @@ const navItems: NavItem[] = [
   { to: '/admin/discount-templates', label: 'Templates', icon: 'bi-bookmark', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/coupons', label: 'Coupons', icon: 'bi-ticket-perforated', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/orders', label: 'Orders', icon: 'bi-receipt', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/currencies', label: 'Currencies', icon: 'bi-currency-exchange', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/regions', label: 'Regions', icon: 'bi-globe', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/managers', label: 'Managers', icon: 'bi-people', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/settings', label: 'Settings', icon: 'bi-gear', visibleFor: () => true },
 ];

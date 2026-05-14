@@ -59,6 +59,30 @@ export interface Product {
   discountPercent?: number;
   discountName?: string;
   discountEndsAt?: string;
+  /** Region restriction (admin-only field; empty/undefined = available globally). */
+  regionIds?: string[];
+}
+
+// Currency / Region Types
+export interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+  exchangeRate: number;
+  isBase: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Region {
+  id: string;
+  name: string;
+  countryCode: string;
+  currencyCode: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Discount Types

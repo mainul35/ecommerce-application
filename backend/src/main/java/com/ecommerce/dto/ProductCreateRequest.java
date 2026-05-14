@@ -42,4 +42,10 @@ public class ProductCreateRequest {
 
     @NotBlank(message = "SKU is required")
     private String sku;
+
+    /**
+     * Optional region restriction: if non-null and non-empty, the product is
+     * only sold in these regions. Empty list / null = available globally.
+     */
+    private List<UUID> regionIds;
 }

@@ -37,18 +37,18 @@ public class AdminProductController {
     private final ProductService productService;
 
     @GetMapping
-    @Operation(summary = "List products (admin view, paginated)")
+    @Operation(summary = "List products (admin view, paginated, no region filter)")
     public Mono<PagedResponse<ProductDto>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String sortBy) {
-        return productService.findAll(page, size, sortBy);
+        return productService.findAll(page, size, sortBy, null);
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get a product by ID (admin)")
+    @Operation(summary = "Get a product by ID (admin) - includes regionIds")
     public Mono<ProductDto> get(@PathVariable UUID id) {
-        return productService.findById(id);
+        return productService.findByIdForAdmin(id);
     }
 
     @PostMapping

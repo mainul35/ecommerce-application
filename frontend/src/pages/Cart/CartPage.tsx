@@ -11,6 +11,7 @@ import {
 } from '../../store/slices/cartSlice';
 import { EmptyState } from '../../components/common';
 import { couponService } from '../../services/couponService';
+import { useCurrency } from '../../storefront/CurrencyContext';
 import type { CouponValidationResponse } from '../../types';
 
 const effectiveUnitPrice = (price: number, discountedPrice?: number): number =>
@@ -18,6 +19,7 @@ const effectiveUnitPrice = (price: number, discountedPrice?: number): number =>
 
 export function CartPage() {
   const dispatch = useAppDispatch();
+  const { format } = useCurrency();
   const cartItems = useAppSelector(selectCartItems);
   // Note: store-level cartTotal still uses sticker price; we recompute with item discounts below.
   const stickerTotal = useAppSelector(selectCartTotal);
@@ -127,10 +129,10 @@ export function CartPage() {
                           {onSale && (
                             <p className="small mb-2">
                               <span className="badge bg-danger-subtle text-danger">
-                                ${unitPrice.toFixed(2)} each
+                                {format(unitPrice)} each
                               </span>{' '}
                               <span className="text-muted text-decoration-line-through small">
-                                ${item.product.price.toFixed(2)}
+                                {format(item.product.price)}
                               </span>
                             </p>
                           )}
@@ -160,7 +162,7 @@ export function CartPage() {
                           </button>
                         </div>
                         <span className="fw-bold">
-                          ${(unitPrice * item.quantity).toFixed(2)}
+                          {format(unitPrice * item.quantity)}
                         </span>
                       </div>
                     </div>
@@ -178,12 +180,12 @@ export function CartPage() {
 
               <div className="d-flex justify-content-between mb-2">
                 <span>Subtotal</span>
-                <span>${stickerTotal.toFixed(2)}</span>
+                <span>{format(stickerTotal)}</span>
               </div>
               {itemDiscountSavings > 0 && (
                 <div className="d-flex justify-content-between mb-2 text-success">
                   <span>Item discounts</span>
-                  <span>-${itemDiscountSavings.toFixed(2)}</span>
+                  <span>-{format(itemDiscountSavings)}</span>
                 </div>
               )}
 
@@ -194,7 +196,7 @@ export function CartPage() {
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <div>
                     <span className="badge bg-success">{coupon.code}</span>
-                    <span className="text-success ms-2">-${coupon.discountAmount.toFixed(2)}</span>
+                    <span className="text-success ms-2">-{format(coupon.discountAmount)}</span>
                   </div>
                   <button
                     type="button"
@@ -228,12 +230,12 @@ export function CartPage() {
 
               <div className="d-flex justify-content-between mb-2">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                <span>{shipping === 0 ? 'Free' : format(shipping)}</span>
               </div>
               <hr />
               <div className="d-flex justify-content-between mb-4">
                 <strong>Total</strong>
-                <strong>${grandTotal.toFixed(2)}</strong>
+                <strong>{format(grandTotal)}</strong>
               </div>
               <Link
                 to={coupon?.valid ? `/checkout?coupon=${encodeURIComponent(coupon.code ?? '')}` : '/checkout'}

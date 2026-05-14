@@ -11,6 +11,7 @@ export interface ProductUpsertRequest {
   attributes?: Record<string, unknown>;
   stock: number;
   sku: string;
+  regionIds?: string[];
 }
 
 const BASE = '/admin/products';

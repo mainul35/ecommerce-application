@@ -5,11 +5,13 @@ import { fetchProductById } from '../../store/slices/productsSlice';
 import { addToCart } from '../../store/slices/cartSlice';
 import { addNotification } from '../../store/slices/uiSlice';
 import { Loading, EmptyState } from '../../components/common';
+import { useCurrency } from '../../storefront/CurrencyContext';
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useAppDispatch();
   const { selectedProduct: product, isLoading, error } = useAppSelector((state) => state.products);
+  const { format } = useCurrency();
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
 
@@ -128,11 +130,11 @@ export function ProductDetailPage() {
           )}
 
           <div className="d-flex align-items-center gap-3 mb-4">
-            <span className="fs-2 fw-bold text-primary">${effectivePrice.toFixed(2)}</span>
+            <span className="fs-2 fw-bold text-primary">{format(effectivePrice)}</span>
             {compareAtPrice && compareAtPrice > effectivePrice && (
               <>
                 <span className="fs-4 text-muted text-decoration-line-through">
-                  ${compareAtPrice.toFixed(2)}
+                  {format(compareAtPrice)}
                 </span>
                 {discountPercentage && (
                   <span className="badge bg-danger">-{discountPercentage}%</span>

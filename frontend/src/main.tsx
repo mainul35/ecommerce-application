@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router-dom';
 import { store } from './store';
 import { router } from './router';
 import { AuthBootstrap } from './routes/AuthBootstrap';
+import { CurrencyProvider } from './storefront/CurrencyContext';
 import './assets/scss/main.scss';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import 'admin-lte/dist/css/adminlte.min.css';
@@ -17,7 +18,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Provider store={store}>
       <AuthBootstrap>
-        <RouterProvider router={router} />
+        <CurrencyProvider>
+          <RouterProvider router={router} />
+        </CurrencyProvider>
       </AuthBootstrap>
     </Provider>
   </StrictMode>

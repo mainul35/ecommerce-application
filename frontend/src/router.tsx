@@ -22,6 +22,8 @@ import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
 import { AdminOrderDetailPage } from './pages/admin/AdminOrderDetailPage';
 import { AdminNewOrderPage } from './pages/admin/AdminNewOrderPage';
 import { AdminManagersPage } from './pages/admin/AdminManagersPage';
+import { AdminCurrenciesPage } from './pages/admin/AdminCurrenciesPage';
+import { AdminRegionsPage } from './pages/admin/AdminRegionsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 
 export const router = createBrowserRouter([
@@ -65,6 +67,8 @@ export const router = createBrowserRouter([
               { path: 'orders/new', element: <AdminNewOrderPage /> },
               { path: 'orders/:id', element: <AdminOrderDetailPage /> },
               { path: 'managers', element: <AdminManagersPage /> },
+              { path: 'currencies', element: <AdminCurrenciesPage /> },
+              { path: 'regions', element: <AdminRegionsPage /> },
             ],
           },
         ],

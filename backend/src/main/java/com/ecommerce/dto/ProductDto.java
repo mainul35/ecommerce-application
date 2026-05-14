@@ -38,4 +38,11 @@ public class ProductDto {
     private String discountName;
     /** When the applied discount expires (used for countdown display). */
     private LocalDateTime discountEndsAt;
+
+    /**
+     * Region restriction. Empty/null means the product is available globally.
+     * Populated only on admin reads (the storefront filters by region instead
+     * of disclosing the allowed-region set).
+     */
+    private List<UUID> regionIds;
 }

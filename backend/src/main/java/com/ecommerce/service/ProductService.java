@@ -15,8 +15,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,10 +34,23 @@ public class ProductService {
     private final CategoryMapper categoryMapper;
     private final DiscountService discountService;
 
-    public Mono<PagedResponse<ProductDto>> findAll(int page, int size, String sortBy) {
+    /**
+     * Storefront product list. When {@code regionId} is non-null, products
+     * with region restrictions excluding that region are filtered out.
+     * When null, no region filter is applied (admin path / unfiltered list).
+     */
+    public Mono<PagedResponse<ProductDto>> findAll(int page, int size, String sortBy, UUID regionId) {
+        if (regionId != null) {
+            int offset = page * size;
+            return discountService.findActive().collectList().flatMap(active ->
+                    productRepository.findVisibleInRegion(regionId, null, size, offset, sortBy)
+                            .flatMap(p -> enrich(p, active))
+                            .collectList()
+                            .zipWith(productRepository.countVisibleInRegion(regionId, null))
+                            .map(t -> PagedResponse.of(t.getT1(), page, size, t.getT2())));
+        }
         Sort sort = parseSort(sortBy);
         PageRequest pageRequest = PageRequest.of(page, size, sort);
-
         return discountService.findActive().collectList().flatMap(active ->
                 productRepository.findByIsActiveTrue(pageRequest)
                         .flatMap(p -> enrich(p, active))
@@ -44,10 +59,19 @@ public class ProductService {
                         .map(t -> PagedResponse.of(t.getT1(), page, size, t.getT2())));
     }
 
-    public Mono<PagedResponse<ProductDto>> findByCategory(UUID categoryId, int page, int size, String sortBy) {
+    public Mono<PagedResponse<ProductDto>> findByCategory(UUID categoryId, int page, int size,
+                                                            String sortBy, UUID regionId) {
+        if (regionId != null) {
+            int offset = page * size;
+            return discountService.findActive().collectList().flatMap(active ->
+                    productRepository.findVisibleInRegion(regionId, categoryId, size, offset, sortBy)
+                            .flatMap(p -> enrich(p, active))
+                            .collectList()
+                            .zipWith(productRepository.countVisibleInRegion(regionId, categoryId))
+                            .map(t -> PagedResponse.of(t.getT1(), page, size, t.getT2())));
+        }
         Sort sort = parseSort(sortBy);
         PageRequest pageRequest = PageRequest.of(page, size, sort);
-
         return discountService.findActive().collectList().flatMap(active ->
                 productRepository.findByCategoryIdAndIsActiveTrue(categoryId, pageRequest)
                         .flatMap(p -> enrich(p, active))
@@ -56,9 +80,16 @@ public class ProductService {
                         .map(t -> PagedResponse.of(t.getT1(), page, size, t.getT2())));
     }
 
-    public Mono<PagedResponse<ProductDto>> search(String query, int page, int size) {
+    public Mono<PagedResponse<ProductDto>> search(String query, int page, int size, UUID regionId) {
         int offset = page * size;
-
+        if (regionId != null) {
+            return discountService.findActive().collectList().flatMap(active ->
+                    productRepository.searchVisibleInRegion(query, regionId, size, offset)
+                            .flatMap(p -> enrich(p, active))
+                            .collectList()
+                            .zipWith(productRepository.countSearchVisibleInRegion(query, regionId))
+                            .map(t -> PagedResponse.of(t.getT1(), page, size, t.getT2())));
+        }
         return discountService.findActive().collectList().flatMap(active ->
                 productRepository.searchByName(query, size, offset)
                         .flatMap(p -> enrich(p, active))
@@ -67,15 +98,42 @@ public class ProductService {
                         .map(t -> PagedResponse.of(t.getT1(), page, size, t.getT2())));
     }
 
-    public Mono<ProductDto> findById(UUID id) {
-        return productRepository.findById(id)
+    /**
+     * Storefront product detail. When {@code regionId} is non-null and the
+     * product is region-restricted to other regions, returns 404 - we don't
+     * surface "exists but blocked" to the customer.
+     */
+    public Mono<ProductDto> findById(UUID id, UUID regionId) {
+        Mono<Product> base = productRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(NOT_FOUND)))
                 .filter(Product::getIsActive)
-                .switchIfEmpty(Mono.error(new ResourceNotFoundException(NOT_FOUND)))
-                .flatMap(p -> discountService.findActive().collectList()
-                        .flatMap(active -> enrich(p, active)));
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(NOT_FOUND)));
+
+        if (regionId != null) {
+            base = base.flatMap(p -> productRepository.isProductVisibleInRegion(p.getId(), regionId)
+                    .flatMap(visible -> Boolean.TRUE.equals(visible)
+                            ? Mono.just(p)
+                            : Mono.error(new ResourceNotFoundException(NOT_FOUND))));
+        }
+        return base.flatMap(p -> discountService.findActive().collectList()
+                .flatMap(active -> enrich(p, active)));
     }
 
+    /** Admin read - includes regionIds, ignores region filter. */
+    public Mono<ProductDto> findByIdForAdmin(UUID id) {
+        return productRepository.findById(id)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException(NOT_FOUND)))
+                .flatMap(p -> discountService.findActive().collectList()
+                        .flatMap(active -> enrich(p, active))
+                        .flatMap(dto -> productRepository.findRegionIdsForProduct(p.getId())
+                                .collectList()
+                                .map(ids -> {
+                                    dto.setRegionIds(ids);
+                                    return dto;
+                                })));
+    }
+
+    @Transactional
     public Mono<ProductDto> create(ProductCreateRequest request) {
         return productRepository.existsBySku(request.getSku())
                 .flatMap(exists -> {
@@ -90,9 +148,14 @@ public class ProductService {
                     product.setId(UUID.randomUUID());
                     return productRepository.save(product);
                 })
-                .flatMap(p -> enrich(p, List.of()));
+                .flatMap(saved -> productRepository
+                        .replaceProductRegions(saved.getId(), nonNull(request.getRegionIds()))
+                        .thenReturn(saved))
+                .flatMap(p -> enrich(p, List.of())
+                        .map(dto -> { dto.setRegionIds(nonNull(request.getRegionIds())); return dto; }));
     }
 
+    @Transactional
     public Mono<ProductDto> update(UUID id, ProductCreateRequest request) {
         return productRepository.findById(id)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException(NOT_FOUND)))
@@ -105,7 +168,11 @@ public class ProductService {
                     existing.setStock(request.getStock());
                     return productRepository.save(existing);
                 })
-                .flatMap(p -> enrich(p, List.of()));
+                .flatMap(saved -> productRepository
+                        .replaceProductRegions(saved.getId(), nonNull(request.getRegionIds()))
+                        .thenReturn(saved))
+                .flatMap(p -> enrich(p, List.of())
+                        .map(dto -> { dto.setRegionIds(nonNull(request.getRegionIds())); return dto; }));
     }
 
     public Mono<Void> delete(UUID id) {
@@ -139,6 +206,10 @@ public class ProductService {
             dto.setDiscountEndsAt(best.getEndsAt());
         });
         return dto;
+    }
+
+    private static <T> List<T> nonNull(List<T> list) {
+        return list == null ? Collections.emptyList() : list;
     }
 
     private Sort parseSort(String sortBy) {

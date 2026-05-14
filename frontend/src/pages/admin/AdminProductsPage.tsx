@@ -4,10 +4,11 @@ import {
   type ProductUpsertRequest,
 } from '../../services/admin/adminProductService';
 import { adminCategoryService } from '../../services/admin/adminCategoryService';
+import { adminRegionService } from '../../services/admin/adminRegionService';
 import { AttributeEditor } from '../../components/admin/AttributeEditor';
 import { DiscountsScopePanel } from '../../components/admin/DiscountsScopePanel';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
-import type { Category, Product } from '../../types';
+import type { Category, Product, Region } from '../../types';
 
 const emptyForm: ProductUpsertRequest = {
   name: '',
@@ -23,6 +24,7 @@ const emptyForm: ProductUpsertRequest = {
 export function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,10 @@ export function AdminProductsPage() {
       .list()
       .then(setCategories)
       .catch((e: Error) => setError(e.message));
+    adminRegionService
+      .list()
+      .then(setRegions)
+      .catch((e: Error) => setError(e.message));
   }, []);
 
   useEffect(() => {
@@ -62,8 +68,16 @@ export function AdminProductsPage() {
     setShowForm(true);
   };
 
-  const startEdit = (p: Product) => {
+  const startEdit = async (p: Product) => {
     setEditingId(p.id);
+    // The list response doesn't include regionIds; fetch the admin detail to populate them.
+    let regionIds: string[] = [];
+    try {
+      const detail = await adminProductService.getById(p.id);
+      regionIds = detail.regionIds ?? [];
+    } catch {
+      // Tolerate failure - fall back to empty list (admin can re-pick).
+    }
     setForm({
       name: p.name,
       description: p.description ?? '',
@@ -73,6 +87,7 @@ export function AdminProductsPage() {
       attributes: p.attributes ?? {},
       stock: p.stock,
       sku: p.sku,
+      regionIds,
     });
     setShowForm(true);
   };
@@ -220,6 +235,56 @@ export function AdminProductsPage() {
                     value={form.attributes ?? {}}
                     onChange={(next) => setForm({ ...form, attributes: next })}
                   />
+                </div>
+                <div className="col-12">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-globe me-1"></i>
+                    Regions where this product is sold
+                  </label>
+                  <div className="form-text mb-2">
+                    Leave all unchecked to sell globally. Tick specific regions to restrict
+                    availability — customers outside the selected regions won't see the product.
+                  </div>
+                  <div className="border rounded p-2 bg-light" style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                    {regions.length === 0 ? (
+                      <p className="text-muted small mb-0">No regions configured yet.</p>
+                    ) : (
+                      regions.map((r) => {
+                        const checked = (form.regionIds ?? []).includes(r.id);
+                        return (
+                          <div key={r.id} className="form-check">
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              id={`region-${r.id}`}
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = new Set(form.regionIds ?? []);
+                                if (e.target.checked) next.add(r.id);
+                                else next.delete(r.id);
+                                setForm({ ...form, regionIds: Array.from(next) });
+                              }}
+                            />
+                            <label className="form-check-label" htmlFor={`region-${r.id}`}>
+                              <code>{r.countryCode}</code> {r.name}{' '}
+                              <span className="text-muted small">({r.currencyCode})</span>
+                            </label>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  {(form.regionIds?.length ?? 0) > 0 && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link p-0"
+                        onClick={() => setForm({ ...form, regionIds: [] })}
+                      >
+                        Clear selection (sell globally)
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="col-12 d-flex gap-2">
                   <button type="submit" className="btn btn-primary" disabled={submitting}>
