@@ -34,8 +34,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Claude metadata
-.claude/
+# Claude metadata — commit the shared config, ignore personal overrides
+.claude/settings.local.json
+CLAUDE.local.md
 
 # Stray Windows-reserved "nul" files left over by redirected commands
 nul
