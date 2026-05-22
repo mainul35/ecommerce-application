@@ -7,8 +7,11 @@
 --
 -- media_type is constrained to IMAGE or VIDEO; enforcement of allowed MIME types
 -- and per-file size limits happens in ProductMediaService, not in the DB.
+--
+-- All DDL uses IF NOT EXISTS / OR REPLACE so the migration is idempotent:
+-- safe to apply against a database where the table was created manually.
 
-CREATE TABLE product_media (
+CREATE TABLE IF NOT EXISTS product_media (
     id            UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id    UUID          NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     -- UUID-based filename on disk to avoid collisions / path-traversal attacks.
@@ -25,8 +28,16 @@ CREATE TABLE product_media (
     updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_product_media_product_id ON product_media(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_media_product_id ON product_media(product_id);
 
-CREATE TRIGGER update_product_media_updated_at
-    BEFORE UPDATE ON product_media
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'update_product_media_updated_at'
+    ) THEN
+        CREATE TRIGGER update_product_media_updated_at
+            BEFORE UPDATE ON product_media
+            FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END;
+$$;
