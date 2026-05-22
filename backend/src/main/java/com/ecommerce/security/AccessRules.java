@@ -46,6 +46,8 @@ public class AccessRules {
                 // Admin/manager login surface: public, but UserService.adminLogin rejects
                 // everyone except ADMIN and MANAGER. MUST come before /api/admin/** below.
                 .pathMatchers("/api/admin/auth/**").permitAll()
+                // Uploaded product photos/videos must be publicly readable for storefront display.
+                .pathMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                 // Currencies and regions: storefront needs them anonymously to render

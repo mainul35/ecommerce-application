@@ -63,6 +63,20 @@ export interface Product {
   regionIds?: string[];
 }
 
+// Product Media
+export interface ProductMedia {
+  id: string;
+  productId: string;
+  mediaType: 'IMAGE' | 'VIDEO';
+  /** Relative path served by the backend, e.g. /uploads/products/{id}/uuid.jpg */
+  url: string;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  sortOrder: number;
+  createdAt: string;
+}
+
 // Currency / Region Types
 export interface Currency {
   code: string;

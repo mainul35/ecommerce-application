@@ -53,6 +53,12 @@ stripe:
   success-url: ${STRIPE_SUCCESS_URL:http://localhost:5174/checkout/success?orderId={CHECKOUT_SESSION_ID}}
   cancel-url:  ${STRIPE_CANCEL_URL:http://localhost:5174/checkout/cancel?orderId={CHECKOUT_SESSION_ID}}
 
+app:
+  # Directory where uploaded product media files are stored.
+  # Resolved relative to the working directory when the app starts (backend/).
+  # Override with UPLOAD_DIR env var in production to use an absolute path.
+  upload-dir: ${UPLOAD_DIR:uploads}
+
 springdoc:
   api-docs:
     path: /api-docs

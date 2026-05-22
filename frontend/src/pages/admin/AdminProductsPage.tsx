@@ -7,6 +7,7 @@ import { adminCategoryService } from '../../services/admin/adminCategoryService'
 import { adminRegionService } from '../../services/admin/adminRegionService';
 import { AttributeEditor } from '../../components/admin/AttributeEditor';
 import { DiscountsScopePanel } from '../../components/admin/DiscountsScopePanel';
+import { ProductMediaUploader } from '../../components/admin/ProductMediaUploader';
 import { PageHeader } from '../../components/admin/layout/PageHeader';
 import type { Category, Product, Region } from '../../types';
 
@@ -297,15 +298,22 @@ export function AdminProductsPage() {
               </div>
             </form>
 
-            {/* Discounts can only be attached to a product after it exists (needs an id). */}
+            {/* Media upload and discounts are only available once the product exists. */}
             {editingId && (
-              <div className="mt-4">
-                <DiscountsScopePanel
-                  scope="PRODUCT"
-                  targetId={editingId}
-                  targetLabel={form.name || 'this product'}
-                />
-              </div>
+              <>
+                <hr className="mt-4" />
+                <div className="mt-3">
+                  <ProductMediaUploader productId={editingId} />
+                </div>
+                <hr className="mt-4" />
+                <div className="mt-3">
+                  <DiscountsScopePanel
+                    scope="PRODUCT"
+                    targetId={editingId}
+                    targetLabel={form.name || 'this product'}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
