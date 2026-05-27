@@ -1,17 +1,29 @@
-import { Link, NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../../store';
 import { selectCartItemCount } from '../../store/slices/cartSlice';
 import { logout } from '../../store/slices/authSlice';
 import { canAccessAdmin } from '../../routes/permissions';
 import { CurrencyPicker } from '../../storefront/CurrencyPicker';
+import { RegionSelector } from '../../storefront/RegionSelector';
 
 export function Navbar() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const cartItemCount = useAppSelector(selectCartItemCount);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleLogout = () => {
     dispatch(logout());
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
   };
 
   return (
@@ -52,16 +64,42 @@ export function Navbar() {
             </li>
           </ul>
 
-          <div className="d-flex align-items-center gap-3">
-            <form className="d-none d-md-flex" role="search">
+          {/* Search bar — visible on md+ inline; full-width inside collapse on mobile */}
+          <form className="d-none d-md-flex me-2" role="search" onSubmit={handleSearch}>
+            <div className="input-group">
               <input
                 className="form-control"
                 type="search"
-                placeholder="Search products..."
+                placeholder="Search products…"
                 aria-label="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-            </form>
+              <button className="btn btn-outline-secondary" type="submit" aria-label="Submit search">
+                <i className="bi bi-search"></i>
+              </button>
+            </div>
+          </form>
 
+          {/* Mobile search — shown inside the collapsed menu */}
+          <form className="d-md-none mb-2" role="search" onSubmit={handleSearch}>
+            <div className="input-group">
+              <input
+                className="form-control"
+                type="search"
+                placeholder="Search products…"
+                aria-label="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button className="btn btn-outline-secondary" type="submit" aria-label="Submit search">
+                <i className="bi bi-search"></i>
+              </button>
+            </div>
+          </form>
+
+          <div className="d-flex align-items-center gap-3">
+            <RegionSelector />
             <CurrencyPicker />
 
             <Link

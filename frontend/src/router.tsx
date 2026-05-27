@@ -6,8 +6,11 @@ import { ProductDetailPage } from './pages/ProductDetail/ProductDetailPage';
 import { CartPage } from './pages/Cart/CartPage';
 import { LoginPage } from './pages/Auth/LoginPage';
 import { RegisterPage } from './pages/Auth/RegisterPage';
+import { CheckoutPage } from './pages/Checkout/CheckoutPage';
 import { CheckoutSuccessPage } from './pages/Checkout/CheckoutSuccessPage';
 import { CheckoutCancelPage } from './pages/Checkout/CheckoutCancelPage';
+import { MockPaymentPage } from './pages/Checkout/MockPaymentPage';
+import { SearchPage } from './pages/Search/SearchPage';
 import { AdminRoute } from './routes/AdminRoute';
 import { AdminOnlyRoute } from './routes/AdminOnlyRoute';
 import { AdminLayout } from './components/admin/layout/AdminLayout';
@@ -37,8 +40,11 @@ export const router = createBrowserRouter([
       { path: 'cart', element: <CartPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
+      { path: 'checkout', element: <CheckoutPage /> },
       { path: 'checkout/success', element: <CheckoutSuccessPage /> },
       { path: 'checkout/cancel', element: <CheckoutCancelPage /> },
+      { path: 'checkout/mock-pay', element: <MockPaymentPage /> },
+      { path: 'search', element: <SearchPage /> },
     ],
   },
   // Admin login is OUTSIDE the AdminRoute guard so unauthenticated users can reach it.

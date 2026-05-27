@@ -11,11 +11,13 @@ import com.ecommerce.mapper.CategoryMapper;
 import com.ecommerce.mapper.ProductMapper;
 import com.ecommerce.repository.CategoryRepository;
 import com.ecommerce.repository.ProductRepository;
+import com.ecommerce.service.search.ProductEmbeddingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Collections;
@@ -33,6 +35,8 @@ public class ProductService {
     private final ProductMapper productMapper;
     private final CategoryMapper categoryMapper;
     private final DiscountService discountService;
+    private final ProductMediaService productMediaService;
+    private final ProductEmbeddingService productEmbeddingService;
 
     /**
      * Storefront product list. When {@code regionId} is non-null, products
@@ -151,6 +155,7 @@ public class ProductService {
                 .flatMap(saved -> productRepository
                         .replaceProductRegions(saved.getId(), nonNull(request.getRegionIds()))
                         .thenReturn(saved))
+                .flatMap(saved -> productEmbeddingService.embedProduct(saved).thenReturn(saved))
                 .flatMap(p -> enrich(p, List.of())
                         .map(dto -> { dto.setRegionIds(nonNull(request.getRegionIds())); return dto; }));
     }
@@ -171,8 +176,16 @@ public class ProductService {
                 .flatMap(saved -> productRepository
                         .replaceProductRegions(saved.getId(), nonNull(request.getRegionIds()))
                         .thenReturn(saved))
+                .flatMap(saved -> productEmbeddingService.embedProduct(saved).thenReturn(saved))
                 .flatMap(p -> enrich(p, List.of())
                         .map(dto -> { dto.setRegionIds(nonNull(request.getRegionIds())); return dto; }));
+    }
+
+    /** Enriches a list of products (discount + category + media). Used by SearchService. */
+    public Flux<ProductDto> enrichAll(List<Product> products) {
+        return discountService.findActive().collectList()
+                .flatMapMany(active -> Flux.fromIterable(products)
+                        .flatMap(p -> enrich(p, active), 8));
     }
 
     public Mono<Void> delete(UUID id) {
@@ -194,7 +207,10 @@ public class ProductService {
         return categoryRepository.findById(product.getCategoryId())
                 .map(category -> productMapper.toDto(product, categoryMapper.toDto(category)))
                 .defaultIfEmpty(productMapper.toDto(product))
-                .map(dto -> applyDiscount(dto, product, activeDiscounts));
+                .map(dto -> applyDiscount(dto, product, activeDiscounts))
+                .flatMap(dto -> productMediaService.findByProduct(product.getId())
+                        .collectList()
+                        .map(mediaList -> { dto.setMedia(mediaList); return dto; }));
     }
 
     private ProductDto applyDiscount(ProductDto dto, Product product, List<Discount> activeDiscounts) {

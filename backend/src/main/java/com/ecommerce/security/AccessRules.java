@@ -56,6 +56,16 @@ public class AccessRules {
                 .pathMatchers(HttpMethod.GET, "/api/regions/**").permitAll()
                 // Stripe webhook is public but signature-verified inside the handler.
                 .pathMatchers(HttpMethod.POST, "/api/webhooks/stripe").permitAll()
+                .pathMatchers(HttpMethod.GET, "/api/payment-gateways").permitAll()
+                .pathMatchers(HttpMethod.GET, "/api/search").permitAll()
+                .pathMatchers(HttpMethod.POST, "/api/search/reindex").hasRole("ADMIN")
+                .pathMatchers("/api/payment/mock/**").permitAll()
+                // Payment gateway callbacks — must be public so remote gateway servers
+                // and customer browsers can reach them without a session token.
+                .pathMatchers("/api/payment/sslcommerz/**").permitAll()
+                .pathMatchers("/api/payment/paypay/**").permitAll()
+                .pathMatchers("/api/payment/linepay/**").permitAll()
+                .pathMatchers("/api/webhooks/omise").permitAll()
                 // ADMIN-only sub-surfaces (must come BEFORE the staff-shared rules so
                 // they take precedence for these specific paths).
                 .pathMatchers("/api/admin/managers/**").hasRole("ADMIN")
@@ -66,9 +76,13 @@ public class AccessRules {
                 // Catch-all for everything else under /api/admin (discounts, coupons,
                 // templates, orders, customers, discount-templates): ADMIN only.
                 .pathMatchers("/api/admin/**").hasRole("ADMIN")
-                // Customer self-checkout: only CUSTOMER role can place/cancel/list their own orders.
-                .pathMatchers("/api/orders/**").hasRole("CUSTOMER")
-                .pathMatchers("/api/coupons/**").hasRole("CUSTOMER")
+                // Orders and coupons: any authenticated user (CUSTOMER, ADMIN, MANAGER) can
+                // place orders through the storefront — the admin panel and storefront share
+                // the same localStorage token, so restricting to CUSTOMER-only blocks admins
+                // who test the storefront while logged into the admin panel.
+                // OrderService scopes each order to the authenticated user's account.
+                .pathMatchers("/api/orders/**").authenticated()
+                .pathMatchers("/api/coupons/**").authenticated()
                 .anyExchange().authenticated();
     }
 }
