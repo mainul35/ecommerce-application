@@ -3,6 +3,7 @@ import { useAppDispatch } from '../../store';
 import { addToCart } from '../../store/slices/cartSlice';
 import { addNotification } from '../../store/slices/uiSlice';
 import { useCurrency } from '../../storefront/CurrencyContext';
+import { mediaUrl } from '../../services/admin/adminProductMediaService';
 import type { Product } from '../../types';
 
 interface ProductCardProps {
@@ -27,6 +28,9 @@ export function ProductCard({ product }: ProductCardProps) {
     );
   };
 
+  const firstImage = product.media?.find((m) => m.mediaType === 'IMAGE');
+  const cardImage = firstImage ? mediaUrl(firstImage.url) : (product.imageUrl || '/placeholder.png');
+
   // Sale-price display is driven entirely by active discount campaigns.
   const hasDiscount = typeof product.discountedPrice === 'number';
   const effectivePrice = hasDiscount ? product.discountedPrice! : product.price;
@@ -40,7 +44,7 @@ export function ProductCard({ product }: ProductCardProps) {
       <Link to={`/products/${product.id}`} className="text-decoration-none">
         <div className="position-relative">
           <img
-            src={product.imageUrl || '/placeholder.png'}
+            src={cardImage}
             className="card-img-top product-image"
             alt={product.name}
           />

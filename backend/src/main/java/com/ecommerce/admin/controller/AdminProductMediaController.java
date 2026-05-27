@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -35,8 +34,8 @@ public class AdminProductMediaController {
     }
 
     @GetMapping
-    public Flux<ProductMediaDto> list(@PathVariable UUID productId) {
-        return mediaService.findByProduct(productId);
+    public Mono<List<ProductMediaDto>> list(@PathVariable UUID productId) {
+        return mediaService.findByProduct(productId).collectList();
     }
 
     @DeleteMapping("/{mediaId}")

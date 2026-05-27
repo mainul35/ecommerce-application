@@ -61,6 +61,8 @@ export interface Product {
   discountEndsAt?: string;
   /** Region restriction (admin-only field; empty/undefined = available globally). */
   regionIds?: string[];
+  /** All media items for this product, ordered by sort_order. */
+  media?: ProductMedia[];
 }
 
 // Product Media
@@ -74,6 +76,17 @@ export interface ProductMedia {
   contentType: string;
   sizeBytes: number;
   sortOrder: number;
+  createdAt: string;
+}
+
+// Product Review
+export interface ProductReview {
+  id: string;
+  productId: string;
+  reviewerName: string;
+  rating: number;
+  title?: string;
+  body?: string;
   createdAt: string;
 }
 

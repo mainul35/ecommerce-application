@@ -30,6 +30,7 @@ public abstract class ProductMapper {
     @Mapping(target = "discountName", ignore = true)
     @Mapping(target = "discountEndsAt", ignore = true)
     @Mapping(target = "regionIds", ignore = true)
+    @Mapping(target = "media", ignore = true)
     public abstract ProductDto toDto(Product product);
 
     public ProductDto toDto(Product product, CategoryDto category) {

@@ -101,6 +101,21 @@ public class GlobalExceptionHandler {
         return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleIllegalStateException(
+            IllegalStateException ex, ServerWebExchange exchange) {
+        log.error("Service misconfiguration: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .status(HttpStatus.SERVICE_UNAVAILABLE.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .path(exchange.getRequest().getPath().value())
+                .build();
+
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error));
+    }
+
     @ExceptionHandler(Exception.class)
     public Mono<ResponseEntity<ErrorResponse>> handleGenericException(
             Exception ex, ServerWebExchange exchange) {

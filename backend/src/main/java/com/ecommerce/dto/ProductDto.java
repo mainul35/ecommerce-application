@@ -45,4 +45,7 @@ public class ProductDto {
      * of disclosing the allowed-region set).
      */
     private List<UUID> regionIds;
+
+    /** All media items for this product, ordered by sort_order ascending. */
+    private List<ProductMediaDto> media;
 }

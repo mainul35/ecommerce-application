@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
   removeFromCart,
@@ -12,14 +12,22 @@ import {
 import { EmptyState } from '../../components/common';
 import { couponService } from '../../services/couponService';
 import { useCurrency } from '../../storefront/CurrencyContext';
-import type { CouponValidationResponse } from '../../types';
+import { mediaUrl } from '../../services/admin/adminProductMediaService';
+import type { CouponValidationResponse, Product } from '../../types';
 
 const effectiveUnitPrice = (price: number, discountedPrice?: number): number =>
   typeof discountedPrice === 'number' ? discountedPrice : price;
 
+interface BuyNowState {
+  product: Product;
+  quantity: number;
+}
+
 export function CartPage() {
   const dispatch = useAppDispatch();
   const { format } = useCurrency();
+  const location = useLocation();
+  const buyNow = (location.state as { buyNow?: BuyNowState } | null)?.buyNow ?? null;
   const cartItems = useAppSelector(selectCartItems);
   // Note: store-level cartTotal still uses sticker price; we recompute with item discounts below.
   const stickerTotal = useAppSelector(selectCartTotal);
@@ -34,11 +42,19 @@ export function CartPage() {
   const handleDecrement = (itemId: string) => dispatch(decrementQuantity(itemId));
   const handleClearCart = () => dispatch(clearCart());
 
-  const itemDiscountedSubtotal = cartItems.reduce(
+  // In buy-now mode we compute totals from the single temporary item, not the cart.
+  const displayItems = buyNow
+    ? [{ id: 'buynow', product: buyNow.product, quantity: buyNow.quantity }]
+    : cartItems;
+
+  const itemDiscountedSubtotal = displayItems.reduce(
     (sum, it) => sum + effectiveUnitPrice(it.product.price, it.product.discountedPrice) * it.quantity,
     0
   );
-  const itemDiscountSavings = stickerTotal - itemDiscountedSubtotal;
+  const buyNowStickerTotal = buyNow
+    ? buyNow.product.price * buyNow.quantity
+    : stickerTotal;
+  const itemDiscountSavings = buyNowStickerTotal - itemDiscountedSubtotal;
 
   const couponDiscount = coupon?.valid ? coupon.discountAmount : 0;
   const subtotalAfterEverything = Math.max(0, itemDiscountedSubtotal - couponDiscount);
@@ -55,7 +71,7 @@ export function CartPage() {
     try {
       const result = await couponService.validate(
         couponCode.trim(),
-        cartItems.map((it) => ({ productId: it.product.id, quantity: it.quantity }))
+        displayItems.map((it) => ({ productId: it.product.id, quantity: it.quantity }))
       );
       if (!result.valid) {
         setCouponError(result.message ?? 'Coupon could not be applied.');
@@ -77,7 +93,7 @@ export function CartPage() {
     setCouponError(null);
   };
 
-  if (cartItems.length === 0) {
+  if (!buyNow && cartItems.length === 0) {
     return (
       <div className="container py-5">
         <EmptyState
@@ -94,23 +110,39 @@ export function CartPage() {
   return (
     <div className="container py-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1>Shopping Cart</h1>
-        <button className="btn btn-outline-danger" onClick={handleClearCart}>
-          Clear Cart
-        </button>
+        {buyNow ? (
+          <div>
+            <h1 className="mb-0">Quick Checkout</h1>
+            <p className="text-muted small mb-0 mt-1">
+              Checking out this item only — your cart is untouched.{' '}
+              <Link to="/cart" replace className="text-decoration-none">Back to cart</Link>
+            </p>
+          </div>
+        ) : (
+          <h1>Shopping Cart</h1>
+        )}
+        {!buyNow && (
+          <button className="btn btn-outline-danger" onClick={handleClearCart}>
+            Clear Cart
+          </button>
+        )}
       </div>
 
       <div className="row g-4">
         <div className="col-12 col-lg-8">
           <div className="card">
             <div className="card-body p-0">
-              {cartItems.map((item) => {
+              {displayItems.map((item) => {
                 const unitPrice = effectiveUnitPrice(item.product.price, item.product.discountedPrice);
                 const onSale = unitPrice < item.product.price;
+                const isBuyNowItem = buyNow !== null;
                 return (
                   <div key={item.id} className="cart-item d-flex gap-3">
                     <img
-                      src={item.product.imageUrl || '/placeholder.png'}
+                      src={(() => {
+                        const first = item.product.media?.find((m) => m.mediaType === 'IMAGE');
+                        return first ? mediaUrl(first.url) : (item.product.imageUrl || '/placeholder.png');
+                      })()}
                       alt={item.product.name}
                       className="cart-item-image"
                     />
@@ -137,29 +169,35 @@ export function CartPage() {
                             </p>
                           )}
                         </div>
-                        <button
-                          className="btn btn-link text-danger p-0"
-                          onClick={() => handleRemove(item.id)}
-                        >
-                          <i className="bi bi-trash"></i>
-                        </button>
+                        {!isBuyNowItem && (
+                          <button
+                            className="btn btn-link text-danger p-0"
+                            onClick={() => handleRemove(item.id)}
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        )}
                       </div>
                       <div className="d-flex justify-content-between align-items-center">
                         <div className="quantity-control">
-                          <button
-                            className="btn btn-outline-secondary btn-sm"
-                            onClick={() => handleDecrement(item.id)}
-                          >
-                            -
-                          </button>
-                          <span className="mx-2">{item.quantity}</span>
-                          <button
-                            className="btn btn-outline-secondary btn-sm"
-                            onClick={() => handleIncrement(item.id)}
-                            disabled={item.quantity >= item.product.stock}
-                          >
-                            +
-                          </button>
+                          {!isBuyNowItem && (
+                            <button
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => handleDecrement(item.id)}
+                            >
+                              -
+                            </button>
+                          )}
+                          <span className={isBuyNowItem ? '' : 'mx-2'}>{item.quantity}</span>
+                          {!isBuyNowItem && (
+                            <button
+                              className="btn btn-outline-secondary btn-sm"
+                              onClick={() => handleIncrement(item.id)}
+                              disabled={item.quantity >= item.product.stock}
+                            >
+                              +
+                            </button>
+                          )}
                         </div>
                         <span className="fw-bold">
                           {format(unitPrice * item.quantity)}
@@ -239,6 +277,7 @@ export function CartPage() {
               </div>
               <Link
                 to={coupon?.valid ? `/checkout?coupon=${encodeURIComponent(coupon.code ?? '')}` : '/checkout'}
+                state={buyNow ? { buyNow } : undefined}
                 className="btn btn-primary w-100 mb-2"
               >
                 Proceed to Checkout

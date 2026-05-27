@@ -15,7 +15,6 @@ const emptyForm: ProductUpsertRequest = {
   name: '',
   description: '',
   price: 0,
-  imageUrl: '',
   categoryId: '',
   attributes: {},
   stock: 0,
@@ -83,7 +82,6 @@ export function AdminProductsPage() {
       name: p.name,
       description: p.description ?? '',
       price: p.price,
-      imageUrl: p.imageUrl ?? '',
       categoryId: p.category?.id ?? '',
       attributes: p.attributes ?? {},
       stock: p.stock,
@@ -151,7 +149,7 @@ export function AdminProductsPage() {
             <h3 className="card-title">{editingId ? 'Edit product' : 'New product'}</h3>
           </div>
           <div className="card-body">
-            <form onSubmit={onSubmit}>
+            <form id="product-form" onSubmit={onSubmit}>
               <div className="row g-3">
                 <div className="col-12 col-md-6">
                   <label className="form-label">Name</label>
@@ -221,15 +219,6 @@ export function AdminProductsPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="col-12">
-                  <label className="form-label">Image URL</label>
-                  <input
-                    type="url"
-                    className="form-control"
-                    value={form.imageUrl ?? ''}
-                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                  />
                 </div>
                 <div className="col-12">
                   <AttributeEditor
@@ -312,6 +301,20 @@ export function AdminProductsPage() {
                     targetId={editingId}
                     targetLabel={form.name || 'this product'}
                   />
+                </div>
+                <hr className="mt-4" />
+                <div className="d-flex gap-2">
+                  <button
+                    type="submit"
+                    form="product-form"
+                    className="btn btn-primary"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Saving…' : 'Update product'}
+                  </button>
+                  <button type="button" className="btn btn-outline-secondary" onClick={reset}>
+                    Cancel
+                  </button>
                 </div>
               </>
             )}

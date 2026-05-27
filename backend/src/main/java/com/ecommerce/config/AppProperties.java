@@ -12,4 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class AppProperties {
     /** Directory where uploaded product media files are stored. */
     private String uploadDir = "uploads";
+
+    /** Frontend base URL — used by MockGateway to build the mock-pay redirect URL. */
+    private String frontendUrl = "http://localhost:5173";
 }

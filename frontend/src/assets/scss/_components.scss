@@ -149,6 +149,189 @@
   font-weight: 600;
 }
 
+// ── Product Detail Page ───────────────────────────────────────────────────────
+
+.pdp-price-block {
+  .pdp-price {
+    font-size: 2rem;
+    font-weight: 800;
+    color: $danger;
+    line-height: 1;
+  }
+  .pdp-original-price {
+    font-size: 1rem;
+    color: $secondary;
+    text-decoration: line-through;
+  }
+  .pdp-discount-badge {
+    font-size: 0.875rem;
+    font-weight: 700;
+    background: $danger;
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: $border-radius-sm;
+  }
+}
+
+.pdp-shipping-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  font-size: 0.825rem;
+  color: $secondary;
+  .pdp-shipping-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    i { color: $success; font-size: 0.95rem; }
+  }
+}
+
+.pdp-tabs {
+  border-bottom: 2px solid #e9ecef;
+  gap: 0;
+  .nav-link {
+    color: $secondary;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-radius: 0;
+    transition: color 0.15s, border-color 0.15s;
+    &.active {
+      color: $primary;
+      border-bottom-color: $primary;
+      background: none;
+      font-weight: 600;
+    }
+    &:hover:not(.active) {
+      color: $dark;
+      border-bottom-color: lighten($primary, 30%);
+    }
+  }
+}
+
+.pdp-tab-pane {
+  padding: 1.75rem 0.25rem;
+}
+
+.pdp-spec-list {
+  .pdp-spec-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: $border-radius-sm;
+    &:nth-child(odd) { background: rgba($primary, 0.03); }
+    .pdp-spec-key {
+      flex: 0 0 140px;
+      font-size: 0.825rem;
+      color: $secondary;
+      text-transform: capitalize;
+    }
+    .pdp-spec-val {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: $dark;
+    }
+  }
+}
+
+.pdp-description {
+  font-size: 0.9rem;
+  color: #4a5568;
+  line-height: 1.75;
+  border-left: 3px solid $primary;
+  padding-left: 1rem;
+}
+
+.pdp-review-card {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: $border-radius-lg;
+  padding: 1rem 1.25rem;
+  .pdp-reviewer-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, $primary, lighten($primary, 20%));
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .pdp-review-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: $dark;
+  }
+  .pdp-review-body {
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.6;
+  }
+  .pdp-review-meta {
+    font-size: 0.75rem;
+    color: $secondary;
+  }
+}
+
+.pdp-rating-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #e9ecef;
+  overflow: hidden;
+  .pdp-rating-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: $warning;
+    transition: width 0.4s ease;
+  }
+}
+
+.pdp-write-review {
+  background: linear-gradient(to bottom right, #f8fafc, #ffffff);
+  border: 1px dashed #cbd5e1;
+  border-radius: $border-radius-lg;
+  padding: 1.5rem;
+}
+
+.pdp-star-input button {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.1s;
+  &:hover { transform: scale(1.2); }
+}
+
+.pdp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e9ecef;
+  }
+  h5 {
+    margin: 0;
+    white-space: nowrap;
+    font-weight: 700;
+    font-size: 1rem;
+    color: $dark;
+  }
+}
+
 // Category Image
 .category-image {
   max-height: 100px;

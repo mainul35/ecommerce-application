@@ -28,7 +28,14 @@
       "Bash(docker cp *)",
       "Bash(curl *)",
       "Bash(powershell *)",
-      "PowerShell(*)"
+      "PowerShell(*)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mainul35\\\\Documents\\\\codes\\\\ecommerce-platform\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Read(//c/Users/mainul35/.claude/projects/c--Users-mainul35-Documents-codes-ecommerce-platform/memory/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\mainul35\\\\Documents\\\\codes\\\\ecommerce-platform\\\\backend\\\\src\\\\main\\\\resources\\\\db\\\\migration\\\\\" -Filter \"*.sql\" | Sort-Object Name | Select-Object -ExpandProperty Name)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\mainul35\\.claude\\projects\\c--Users-mainul35-Documents-codes-ecommerce-platform\\memory"
     ]
   }
 }

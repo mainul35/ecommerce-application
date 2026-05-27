@@ -58,6 +58,45 @@ app:
   # Resolved relative to the working directory when the app starts (backend/).
   # Override with UPLOAD_DIR env var in production to use an absolute path.
   upload-dir: ${UPLOAD_DIR:uploads}
+  # Frontend base URL — used by payment gateways for success/cancel redirects.
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  # Backend base URL — used by payment gateways for server-side callback URLs.
+  # In development, expose via ngrok or similar so remote gateways can reach it.
+  backend-url: ${BACKEND_URL:http://localhost:8080}
+
+ollama:
+  # Base URL of the local Ollama server. In production, point to your hosted instance.
+  url: ${OLLAMA_URL:http://localhost:11434}
+  # Embedding model pulled in Ollama. Run: ollama pull nomic-embed-text
+  # For better multilingual support (JP/TH): ollama pull mxbai-embed-large (change dimensions to 1024)
+  model: ${OLLAMA_EMBED_MODEL:nomic-embed-text}
+  # Must match the model's output size AND the vector(N) column in V15 migration.
+  dimensions: ${OLLAMA_EMBED_DIMENSIONS:768}
+
+forex:
+  # Frankfurter open API — no key required.
+  api-url: ${FOREX_API_URL:https://api.frankfurter.app/latest}
+  # Applied on top of the mid-market rate before storing (0.5 = 0.5 %).
+  markup-percent: ${FOREX_MARKUP_PERCENT:0.5}
+  # Daily refresh at 00:01. Override via FOREX_CRON env var.
+  cron: ${FOREX_CRON:0 1 0 * * *}
+
+payment:
+  sslcommerz:
+    store-id: ${SSLCOMMERZ_STORE_ID:PLACEHOLDER}
+    store-pass: ${SSLCOMMERZ_STORE_PASS:PLACEHOLDER}
+    sandbox: ${SSLCOMMERZ_SANDBOX:true}
+  paypay:
+    api-key: ${PAYPAY_API_KEY:PLACEHOLDER}
+    api-secret: ${PAYPAY_API_SECRET:PLACEHOLDER}
+    sandbox: ${PAYPAY_SANDBOX:true}
+  omise:
+    public-key: ${OMISE_PUBLIC_KEY:PLACEHOLDER}
+    secret-key: ${OMISE_SECRET_KEY:PLACEHOLDER}
+  linepay:
+    channel-id: ${LINEPAY_CHANNEL_ID:PLACEHOLDER}
+    channel-secret: ${LINEPAY_CHANNEL_SECRET:PLACEHOLDER}
+    sandbox: ${LINEPAY_SANDBOX:true}
 
 springdoc:
   api-docs:
