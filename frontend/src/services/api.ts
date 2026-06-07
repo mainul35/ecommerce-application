@@ -27,9 +27,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
-    if (error.response?.status === 401) {
+    // 401 on a login/register call means "wrong credentials" - let the form
+    // show the error instead of hijacking the page. Only 401s on protected
+    // resources mean "session expired/invalid" and warrant a redirect.
+    const requestUrl = error.config?.url ?? '';
+    const isAuthAttempt = requestUrl.includes('/auth/');
+
+    if (error.response?.status === 401 && !isAuthAttempt) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Keep admins on the admin surface - bouncing them to the storefront
+      // login from /admin/* pages is disorienting.
+      window.location.href = window.location.pathname.startsWith('/admin')
+        ? '/admin/login'
+        : '/login';
     }
 
     const errorMessage =
