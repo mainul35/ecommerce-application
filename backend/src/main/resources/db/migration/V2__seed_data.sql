@@ -5,7 +5,7 @@ INSERT INTO users (id, email, password, first_name, last_name, role, is_active, 
 VALUES (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     'admin@ecommerce.com',
-    '$2a$10$rqnSVNIFfQ0OPbZzP7t5beZlmNFzF.d1lOKITDaM9t3U0sG8WeCmS',
+    '$2a$10$FQr2BxSGLl4Hw2X83Dm19.R/frWilPCE6Si0d5/I0qKaIKixo8kly',
     'Admin',
     'User',
     'ADMIN',
