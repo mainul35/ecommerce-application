@@ -103,7 +103,14 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Flyway for Database Migrations -->
+        <!-- Flyway for Database Migrations.
+             Boot 4 modularized auto-configuration: spring-boot-flyway carries
+             FlywayAutoConfiguration - without it spring.flyway.* is ignored
+             and migrations silently never run. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-flyway</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
