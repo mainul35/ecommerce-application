@@ -42,6 +42,7 @@ public class OrderService {
     private final StockReservationService stockReservationService;
     private final DiscountService discountService;
     private final CouponService couponService;
+    private final EscrowService escrowService;
 
     @Value("${reservation.ttl-hours:168}")
     private long reservationTtlHours;
@@ -105,7 +106,11 @@ public class OrderService {
                                 "Illegal status transition: " + order.getStatus() + " -> " + newStatus));
                     }
                     order.setStatus(newStatus);
-                    return orderRepository.save(order);
+                    // DELIVERED starts the buyer-protection countdown on the held escrow.
+                    Mono<Void> escrowHook = (newStatus == Order.OrderStatus.DELIVERED)
+                            ? escrowService.beginProtectionWindow(order.getId())
+                            : Mono.empty();
+                    return orderRepository.save(order).flatMap(saved -> escrowHook.thenReturn(saved));
                 })
                 .flatMap(this::enrichWithItems);
     }
@@ -264,7 +269,10 @@ public class OrderService {
                                 order.setPaidAt(LocalDateTime.now());
                                 order.setPaymentIntentId(paymentIntentId);
                                 return orderRepository.save(order);
-                            }));
+                            }))
+                            // Marketplace escrow: journal the captured funds as HELD
+                            // per seller group until buyer protection concludes.
+                            .flatMap(saved -> escrowService.holdFunds(saved).thenReturn(saved));
                 });
     }
 
@@ -334,6 +342,9 @@ public class OrderService {
                             .productImage(product.getImageUrl())
                             .quantity(item.getQuantity())
                             .price(unitPrice)
+                            // Seller snapshot: escrow groups items by this at payment time.
+                            .sellerId(product.getVendorId())
+                            .returnedQuantity(0)
                             .build();
 
                     return orderItemRepository.save(orderItem);

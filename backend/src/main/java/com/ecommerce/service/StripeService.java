@@ -98,6 +98,36 @@ public class StripeService {
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
     }
 
+    /**
+     * Refund part (or all) of a captured payment back to the customer's original
+     * card. Stripe pushes the money to the card used at checkout; if that card
+     * was closed, the card network re-routes it to the customer's bank account.
+     *
+     * Accepts either a PaymentIntent id ({@code pi_...}) or a Checkout Session id
+     * ({@code cs_...}) - the session is resolved to its PaymentIntent first.
+     */
+    public Mono<Void> refund(String paymentRef, BigDecimal amount) {
+        if (!isConfigured()) {
+            return Mono.error(new IllegalStateException("Stripe is not configured - cannot refund"));
+        }
+        return Mono.fromCallable(() -> {
+                    String paymentIntentId = paymentRef;
+                    if (paymentRef != null && paymentRef.startsWith("cs_")) {
+                        paymentIntentId = Session.retrieve(paymentRef).getPaymentIntent();
+                    }
+                    com.stripe.param.RefundCreateParams params = com.stripe.param.RefundCreateParams.builder()
+                            .setPaymentIntent(paymentIntentId)
+                            .setAmount(toMinorUnits(amount))
+                            .build();
+                    com.stripe.model.Refund refund = com.stripe.model.Refund.create(params);
+                    log.info("Stripe refund {} created for {} ({} minor units)",
+                            refund.getId(), paymentIntentId, refund.getAmount());
+                    return refund;
+                })
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .then();
+    }
+
     private Session buildSession(Order order, java.util.List<OrderItem> items) throws StripeException {
         SessionCreateParams.Builder params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)

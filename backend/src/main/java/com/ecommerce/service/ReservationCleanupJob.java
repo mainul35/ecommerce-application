@@ -30,6 +30,7 @@ public class ReservationCleanupJob {
     public void cleanup() {
         // Single statement: delete expired reservations, then cancel any orders
         // whose reservations all just expired (and were still PENDING).
+        // Status codes are numeric (NumericEnum): 5 = CANCELLED, 0 = PENDING.
         String deleteExpired = """
                 WITH expired AS (
                     DELETE FROM stock_reservations
@@ -37,12 +38,12 @@ public class ReservationCleanupJob {
                     RETURNING order_id
                 )
                 UPDATE orders o
-                SET status              = 'CANCELLED',
+                SET status              = 5,
                     cancelled_at        = NOW(),
                     cancellation_reason = 'Reservation expired'
                 FROM (SELECT DISTINCT order_id FROM expired) e
                 WHERE o.id = e.order_id
-                  AND o.status = 'PENDING'
+                  AND o.status = 0
                 """;
 
         db.sql(deleteExpired)

@@ -20,6 +20,7 @@ public class OrderDto {
     private UUID userId;
     private List<OrderItemDto> items;
     private Order.OrderStatus status;
+    private Order.PaymentStatus paymentStatus;
     private BigDecimal subtotalAmount;
     private String couponCode;
     private BigDecimal couponDiscountAmount;

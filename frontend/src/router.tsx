@@ -11,6 +11,13 @@ import { CheckoutSuccessPage } from './pages/Checkout/CheckoutSuccessPage';
 import { CheckoutCancelPage } from './pages/Checkout/CheckoutCancelPage';
 import { MockPaymentPage } from './pages/Checkout/MockPaymentPage';
 import { SearchPage } from './pages/Search/SearchPage';
+import {
+  OrdersPage,
+  OrderDetailPage,
+  DisputesPage,
+  DisputeDetailPage,
+  WalletPage,
+} from './pages/Account';
 import { AdminRoute } from './routes/AdminRoute';
 import { AdminOnlyRoute } from './routes/AdminOnlyRoute';
 import { AdminLayout } from './components/admin/layout/AdminLayout';
@@ -28,6 +35,10 @@ import { AdminManagersPage } from './pages/admin/AdminManagersPage';
 import { AdminCurrenciesPage } from './pages/admin/AdminCurrenciesPage';
 import { AdminRegionsPage } from './pages/admin/AdminRegionsPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { AdminEscrowPage } from './pages/admin/AdminEscrowPage';
+import { AdminDisputesPage } from './pages/admin/AdminDisputesPage';
+import { AdminDisputeDetailPage } from './pages/admin/AdminDisputeDetailPage';
+import { AdminReturnsPage } from './pages/admin/AdminReturnsPage';
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +56,14 @@ export const router = createBrowserRouter([
       { path: 'checkout/cancel', element: <CheckoutCancelPage /> },
       { path: 'checkout/mock-pay', element: <MockPaymentPage /> },
       { path: 'search', element: <SearchPage /> },
+      // Buyer account: orders with escrow/buyer-protection, disputes, wallet.
+      // No route guard needed - the APIs are authenticated and the axios
+      // interceptor bounces 401s to /login.
+      { path: 'account/orders', element: <OrdersPage /> },
+      { path: 'account/orders/:id', element: <OrderDetailPage /> },
+      { path: 'account/disputes', element: <DisputesPage /> },
+      { path: 'account/disputes/:id', element: <DisputeDetailPage /> },
+      { path: 'account/wallet', element: <WalletPage /> },
     ],
   },
   // Admin login is OUTSIDE the AdminRoute guard so unauthenticated users can reach it.
@@ -72,6 +91,10 @@ export const router = createBrowserRouter([
               { path: 'orders', element: <AdminOrdersPage /> },
               { path: 'orders/new', element: <AdminNewOrderPage /> },
               { path: 'orders/:id', element: <AdminOrderDetailPage /> },
+              { path: 'escrow', element: <AdminEscrowPage /> },
+              { path: 'disputes', element: <AdminDisputesPage /> },
+              { path: 'disputes/:id', element: <AdminDisputeDetailPage /> },
+              { path: 'returns', element: <AdminReturnsPage /> },
               { path: 'managers', element: <AdminManagersPage /> },
               { path: 'currencies', element: <AdminCurrenciesPage /> },
               { path: 'regions', element: <AdminRegionsPage /> },

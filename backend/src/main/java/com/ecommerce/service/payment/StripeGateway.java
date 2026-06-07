@@ -29,4 +29,14 @@ public class StripeGateway implements PaymentGateway {
     public Mono<String> createCheckoutSession(Order order) {
         return stripeService.createCheckoutSession(order);
     }
+
+    @Override
+    public boolean supportsRefunds() {
+        return stripeService.isConfigured();
+    }
+
+    @Override
+    public Mono<Void> refund(String paymentRef, java.math.BigDecimal amount) {
+        return stripeService.refund(paymentRef, amount);
+    }
 }

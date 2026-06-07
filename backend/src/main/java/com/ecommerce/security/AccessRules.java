@@ -46,6 +46,9 @@ public class AccessRules {
                 // Admin/manager login surface: public, but UserService.adminLogin rejects
                 // everyone except ADMIN and MANAGER. MUST come before /api/admin/** below.
                 .pathMatchers("/api/admin/auth/**").permitAll()
+                // Dispute evidence is sensitive - require authentication. MUST come
+                // before the public /uploads/** rule below (first match wins).
+                .pathMatchers(HttpMethod.GET, "/uploads/disputes/**").authenticated()
                 // Uploaded product photos/videos must be publicly readable for storefront display.
                 .pathMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/products/**").permitAll()
@@ -83,6 +86,12 @@ public class AccessRules {
                 // OrderService scopes each order to the authenticated user's account.
                 .pathMatchers("/api/orders/**").authenticated()
                 .pathMatchers("/api/coupons/**").authenticated()
+                // Buyer protection surfaces: disputes (buyer/seller party-checked in
+                // DisputeService), wallets, and return requests are per-user scoped
+                // inside the services - any authenticated account may reach them.
+                .pathMatchers("/api/disputes/**").authenticated()
+                .pathMatchers("/api/wallet/**").authenticated()
+                .pathMatchers("/api/returns/**").authenticated()
                 .anyExchange().authenticated();
     }
 }

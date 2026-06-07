@@ -128,8 +128,18 @@ export function Navbar() {
                     </Link>
                   </li>
                   <li>
-                    <Link className="dropdown-item" to="/orders">
+                    <Link className="dropdown-item" to="/account/orders">
                       My Orders
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className="dropdown-item" to="/account/disputes">
+                      My Disputes
+                    </Link>
+                  </li>
+                  <li>
+                    <Link className="dropdown-item" to="/account/wallet">
+                      Wallet
                     </Link>
                   </li>
                   {canAccessAdmin(user) && (

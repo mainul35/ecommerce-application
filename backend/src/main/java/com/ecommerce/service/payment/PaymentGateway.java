@@ -41,4 +41,22 @@ public interface PaymentGateway {
      * Must never block — use Schedulers.boundedElastic() for any blocking SDK calls.
      */
     Mono<String> createCheckoutSession(Order order);
+
+    /**
+     * Whether this gateway can push money back to the customer's original
+     * payment method. When false, refunds fall back to the in-app wallet.
+     */
+    default boolean supportsRefunds() {
+        return false;
+    }
+
+    /**
+     * Refund {@code amount} of the payment referenced by {@code paymentRef}
+     * (the value stored at markPaid time, e.g. a Stripe PaymentIntent id).
+     * Must never block — use Schedulers.boundedElastic() for any blocking SDK calls.
+     */
+    default Mono<Void> refund(String paymentRef, java.math.BigDecimal amount) {
+        return Mono.error(new UnsupportedOperationException(
+                getGatewayId() + " does not support refunds"));
+    }
 }

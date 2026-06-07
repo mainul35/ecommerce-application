@@ -76,20 +76,32 @@ public class Order extends BaseEntity {
     @Column("subtotal_amount")
     private BigDecimal subtotalAmount;
 
-    public enum OrderStatus {
-        PENDING,
-        CONFIRMED,
-        PROCESSING,
-        SHIPPED,
-        DELIVERED,
-        CANCELLED,
-        REFUNDED
+    /** Stored as SMALLINT - codes are a persisted contract, never renumber. */
+    @lombok.Getter
+    @lombok.RequiredArgsConstructor
+    public enum OrderStatus implements NumericEnum {
+        PENDING(0),
+        CONFIRMED(1),
+        PROCESSING(2),
+        SHIPPED(3),
+        DELIVERED(4),
+        CANCELLED(5),
+        REFUNDED(6);
+
+        private final int code;
     }
 
-    public enum PaymentStatus {
-        PENDING,
-        COMPLETED,
-        FAILED,
-        REFUNDED
+    /** Stored as SMALLINT - codes are a persisted contract, never renumber. */
+    @lombok.Getter
+    @lombok.RequiredArgsConstructor
+    public enum PaymentStatus implements NumericEnum {
+        PENDING(0),
+        COMPLETED(1),
+        FAILED(2),
+        REFUNDED(3),
+        /** Part of the order was refunded (item return / partial dispute resolution). */
+        PARTIALLY_REFUNDED(4);
+
+        private final int code;
     }
 }

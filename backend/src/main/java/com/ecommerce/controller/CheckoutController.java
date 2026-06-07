@@ -38,6 +38,11 @@ public class CheckoutController {
 
         return orderRepository.findById(orderId)
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Order not found")))
+                // Persist the chosen gateway so refunds can route back through it later.
+                .flatMap(order -> {
+                    order.setPaymentMethod(gateway);
+                    return orderRepository.save(order);
+                })
                 .flatMap(order -> gatewayRegistry.find(gateway)
                         .map(gw -> gw.createCheckoutSession(order))
                         .orElseGet(() -> Mono.error(

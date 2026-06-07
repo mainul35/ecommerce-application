@@ -356,3 +356,18 @@
   font-size: 0.75rem;
   @include flex-center;
 }
+
+// Buyer account: order detail + dispute conversation
+.order-item-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: $border-radius;
+}
+
+.dispute-attachment {
+  max-width: 280px;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: $border-radius;
+}

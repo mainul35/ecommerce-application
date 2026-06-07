@@ -35,4 +35,15 @@ public class MockGateway implements PaymentGateway {
         log.info("Mock checkout session created for order {}: {}", order.getId(), url);
         return Mono.just(url);
     }
+
+    @Override
+    public boolean supportsRefunds() {
+        return true;
+    }
+
+    @Override
+    public Mono<Void> refund(String paymentRef, java.math.BigDecimal amount) {
+        log.info("Mock refund of {} issued for payment ref {}", amount, paymentRef);
+        return Mono.empty();
+    }
 }

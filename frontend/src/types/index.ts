@@ -217,6 +217,10 @@ export interface Order {
   userId: string;
   items: OrderItem[];
   status: OrderStatus;
+  paymentStatus?: PaymentStatus;
+  subtotalAmount?: number;
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
   totalAmount: number;
   shippingAddress: Address;
   billingAddress: Address;
@@ -232,6 +236,10 @@ export interface OrderItem {
   productImage: string;
   quantity: number;
   price: number;
+  /** Seller snapshot; null/undefined = platform-owned item. */
+  sellerId?: string | null;
+  /** Units already refunded via approved returns. */
+  returnedQuantity?: number;
 }
 
 export type OrderStatus =
@@ -242,6 +250,135 @@ export type OrderStatus =
   | 'DELIVERED'
   | 'CANCELLED'
   | 'REFUNDED';
+
+export type PaymentStatus =
+  | 'PENDING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED';
+
+// ---- Marketplace escrow / buyer protection ----
+
+export type EscrowStatus = 'HELD' | 'RELEASED' | 'DISPUTED' | 'REFUNDED';
+
+export interface EscrowTransaction {
+  id: string;
+  orderId: string;
+  sellerId?: string | null;
+  sellerName?: string;
+  amount: number;
+  refundedAmount: number;
+  currencyCode: string;
+  status: EscrowStatus;
+  gatewayId?: string | null;
+  /** Auto-release deadline; set once the order is DELIVERED. */
+  holdUntil?: string | null;
+  releasedAt?: string | null;
+  createdAt: string;
+}
+
+export type DisputeStatus =
+  | 'OPEN'
+  | 'ESCALATED'
+  | 'RESOLVED_RELEASED'
+  | 'RESOLVED_REFUNDED'
+  | 'WITHDRAWN';
+
+export interface Dispute {
+  id: string;
+  escrowTransactionId: string;
+  orderId: string;
+  orderItemId?: string | null;
+  openedByUserId: string;
+  openedByName?: string;
+  sellerId?: string | null;
+  sellerName?: string;
+  escrowAmount: number;
+  escrowRefundedAmount: number;
+  reason: string;
+  status: DisputeStatus;
+  escalatedAt?: string | null;
+  resolvedByUserId?: string | null;
+  resolutionNote?: string | null;
+  refundAmount?: number | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+}
+
+export type DisputeAuthorRole = 'BUYER' | 'SELLER' | 'STAFF';
+export type DisputeAttachmentType = 'IMAGE' | 'VIDEO';
+
+export interface DisputeAttachment {
+  id: string;
+  url: string;
+  originalName?: string;
+  contentType?: string;
+  attachmentType: DisputeAttachmentType;
+  sizeBytes?: number;
+}
+
+export interface DisputeMessage {
+  id: string;
+  disputeId: string;
+  senderUserId: string;
+  senderName?: string;
+  authorRole: DisputeAuthorRole;
+  body?: string | null;
+  attachments: DisputeAttachment[];
+  createdAt: string;
+}
+
+// ---- Wallet ----
+
+export type WalletTransactionType = 'CREDIT' | 'DEBIT';
+export type WalletReferenceType =
+  | 'ESCROW_RELEASE'
+  | 'DISPUTE_REFUND'
+  | 'RETURN_REFUND'
+  | 'ADJUSTMENT'
+  | 'WITHDRAWAL';
+
+export interface Wallet {
+  id: string;
+  userId: string;
+  balance: number;
+  currencyCode: string;
+  updatedAt?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: WalletTransactionType;
+  amount: number;
+  balanceAfter: number;
+  referenceType: WalletReferenceType;
+  referenceId?: string | null;
+  description?: string;
+  createdAt: string;
+}
+
+// ---- Returns ----
+
+export type ReturnStatus = 'REQUESTED' | 'REFUNDED' | 'REJECTED' | 'CANCELLED';
+export type RefundDestination = 'GATEWAY' | 'WALLET';
+
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  orderItemId: string;
+  escrowTransactionId: string;
+  productName?: string;
+  productImage?: string;
+  quantity: number;
+  reason: string;
+  status: ReturnStatus;
+  refundAmount: number;
+  refundDestination?: RefundDestination | null;
+  rejectionReason?: string | null;
+  resolvedAt?: string | null;
+  createdAt: string;
+}
 
 export interface Address {
   id?: string;

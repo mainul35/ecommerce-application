@@ -19,4 +19,6 @@ public class OrderItemDto {
     private String productImage;
     private Integer quantity;
     private BigDecimal price;
+    private UUID sellerId;
+    private Integer returnedQuantity;
 }

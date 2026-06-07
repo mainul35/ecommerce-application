@@ -36,4 +36,12 @@ public class OrderItem extends BaseEntity {
 
     @Column("price")
     private BigDecimal price;
+
+    /** Seller snapshot from products.vendor_id at order time. NULL = platform-owned item. */
+    @Column("seller_id")
+    private UUID sellerId;
+
+    /** Units already refunded via approved returns. Never exceeds {@link #quantity}. */
+    @Column("returned_quantity")
+    private Integer returnedQuantity;
 }

@@ -46,6 +46,14 @@ reservation:
   cleanup-interval-ms: ${RESERVATION_CLEANUP_MS:300000}  # 5 minutes
   cleanup-initial-delay-ms: 60000
 
+# Marketplace escrow: buyer-protection window after delivery, during which the
+# buyer can confirm receipt, open a dispute, or request item returns. When the
+# window lapses silently, held funds auto-release to the seller's wallet.
+escrow:
+  protection-days: ${ESCROW_PROTECTION_DAYS:7}
+  release-interval-ms: ${ESCROW_RELEASE_INTERVAL_MS:300000}   # 5 minutes
+  release-initial-delay-ms: 90000
+
 # Stripe payment integration. Replace placeholders with sk_test_... and whsec_... keys.
 stripe:
   secret-key: ${STRIPE_SECRET_KEY:sk_test_PLACEHOLDER_REPLACE_VIA_ENV}
