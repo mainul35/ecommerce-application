@@ -2,6 +2,11 @@
 backend/target/
 backend/.mvn/
 backend/HELP.md
+# Machine-local Spring Boot overrides (e.g. non-default DB port).
+# Both locations are covered because the IDE/CLI working directory may be
+# either the repo root or backend/.
+backend/config/
+/config/
 *.class
 *.jar
 *.war
