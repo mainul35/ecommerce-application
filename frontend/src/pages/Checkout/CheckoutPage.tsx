@@ -74,7 +74,7 @@ export function CheckoutPage() {
   const [searchParams] = useSearchParams();
   const { format, region } = useCurrency();
 
-  const { isAuthenticated } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, user } = useAppSelector((s) => s.auth);
   const cartItems = useAppSelector(selectCartItems);
   const buyNow = (location.state as { buyNow?: BuyNowState } | null)?.buyNow ?? null;
   const couponCode = searchParams.get('coupon') ?? null;
@@ -120,6 +120,22 @@ export function CheckoutPage() {
           >
             Sign in
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Mandatory verification gate (backend also enforces with a 403).
+  if (user && !(user.emailVerified && user.phoneVerified)) {
+    return (
+      <div className="container py-5">
+        <div className="text-center">
+          <i className="bi bi-shield-exclamation text-warning d-block mb-3 display-4"></i>
+          <h4 className="fw-bold mb-2">Verify your account to check out</h4>
+          <p className="text-muted mb-4">
+            Placing orders requires a verified email and phone number.
+          </p>
+          <Link to="/verify" className="btn btn-primary px-4">Verify my account</Link>
         </div>
       </div>
     );

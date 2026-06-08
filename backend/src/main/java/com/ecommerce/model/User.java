@@ -37,6 +37,21 @@ public class User extends BaseEntity {
     @Column("email_verified")
     private Boolean emailVerified;
 
+    /** Contact phone, collected on the verify page (not at signup). */
+    @Column("phone")
+    private String phone;
+
+    @Column("phone_verified")
+    private Boolean phoneVerified;
+
+    /** e-KYC outcome: true once photo-ID + face + address verification passed.
+     * The only durable trace of the verification - evidence is purged. */
+    @Column("id_verified")
+    private Boolean idVerified;
+
+    @Column("id_verified_at")
+    private java.time.LocalDateTime idVerifiedAt;
+
     public enum UserRole {
         CUSTOMER,
         ADMIN,

@@ -43,6 +43,7 @@ public class OrderService {
     private final DiscountService discountService;
     private final CouponService couponService;
     private final EscrowService escrowService;
+    private final com.ecommerce.repository.UserRepository userRepository;
 
     @Value("${reservation.ttl-hours:168}")
     private long reservationTtlHours;
@@ -158,10 +159,24 @@ public class OrderService {
     /**
      * Create a customer-self-checkout order. Stock is RESERVED here (not decremented);
      * the reservation expires after {@link #reservationTtlHours} unless the order is paid.
+     *
+     * Gated on account verification: a self-checkout buyer must have a verified
+     * email AND phone. (Admin create-on-behalf is NOT gated - that's staff action.)
      */
     @Transactional
     public Mono<OrderDto> create(UUID userId, OrderCreateRequest request) {
-        return createInternal(userId, null, request);
+        return requireVerifiedAccount(userId)
+                .then(createInternal(userId, null, request));
+    }
+
+    private Mono<Void> requireVerifiedAccount(UUID userId) {
+        return userRepository.findById(userId)
+                .switchIfEmpty(Mono.error(new ResourceNotFoundException("User not found")))
+                .flatMap(user -> com.ecommerce.service.VerificationService.isFullyVerified(user)
+                        ? Mono.empty()
+                        : Mono.error(new com.ecommerce.exception.VerificationRequiredException(
+                                "Please verify your email and phone number before checking out.")))
+                .then();
     }
 
     /**

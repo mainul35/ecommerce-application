@@ -18,6 +18,8 @@ import {
   DisputeDetailPage,
   WalletPage,
 } from './pages/Account';
+import { SellerVerificationPage } from './pages/Kyc';
+import { VerifyAccountPage, VerifyEmailPage } from './pages/Verify';
 import { AdminRoute } from './routes/AdminRoute';
 import { AdminOnlyRoute } from './routes/AdminOnlyRoute';
 import { AdminLayout } from './components/admin/layout/AdminLayout';
@@ -39,6 +41,8 @@ import { AdminEscrowPage } from './pages/admin/AdminEscrowPage';
 import { AdminDisputesPage } from './pages/admin/AdminDisputesPage';
 import { AdminDisputeDetailPage } from './pages/admin/AdminDisputeDetailPage';
 import { AdminReturnsPage } from './pages/admin/AdminReturnsPage';
+import { AdminKycPage } from './pages/admin/AdminKycPage';
+import { AdminKycDetailPage } from './pages/admin/AdminKycDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -64,6 +68,11 @@ export const router = createBrowserRouter([
       { path: 'account/disputes', element: <DisputesPage /> },
       { path: 'account/disputes/:id', element: <DisputeDetailPage /> },
       { path: 'account/wallet', element: <WalletPage /> },
+      // Seller e-KYC wizard: register as a seller / verify identity.
+      { path: 'sell', element: <SellerVerificationPage /> },
+      // Mandatory account verification (email + phone).
+      { path: 'verify', element: <VerifyAccountPage /> },
+      { path: 'verify-email', element: <VerifyEmailPage /> },
     ],
   },
   // Admin login is OUTSIDE the AdminRoute guard so unauthenticated users can reach it.
@@ -95,6 +104,8 @@ export const router = createBrowserRouter([
               { path: 'disputes', element: <AdminDisputesPage /> },
               { path: 'disputes/:id', element: <AdminDisputeDetailPage /> },
               { path: 'returns', element: <AdminReturnsPage /> },
+              { path: 'kyc', element: <AdminKycPage /> },
+              { path: 'kyc/:id', element: <AdminKycDetailPage /> },
               { path: 'managers', element: <AdminManagersPage /> },
               { path: 'currencies', element: <AdminCurrenciesPage /> },
               { path: 'regions', element: <AdminRegionsPage /> },

@@ -18,5 +18,16 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Dev mail server for account-verification emails. SMTP on 1025 (matches
+  # spring.mail defaults); web inbox to read sent mail at http://localhost:8025.
+  # Nothing is delivered to the outside world - perfect for local/QA.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ecommerce-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # web UI / REST API
+    restart: unless-stopped
+
 volumes:
   postgres_data:

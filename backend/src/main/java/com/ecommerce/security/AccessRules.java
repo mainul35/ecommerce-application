@@ -43,6 +43,10 @@ public class AccessRules {
         return exchanges
                 .pathMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/webjars/**").permitAll()
                 .pathMatchers("/api/auth/**").permitAll()
+                // Email confirmation is opened from the inbox link, possibly with no
+                // session - the opaque token authenticates it. Other verification
+                // endpoints (status, resend, phone) require the authed account.
+                .pathMatchers(HttpMethod.POST, "/api/verification/email/verify").permitAll()
                 // Admin/manager login surface: public, but UserService.adminLogin rejects
                 // everyone except ADMIN and MANAGER. MUST come before /api/admin/** below.
                 .pathMatchers("/api/admin/auth/**").permitAll()
@@ -92,6 +96,10 @@ public class AccessRules {
                 .pathMatchers("/api/disputes/**").authenticated()
                 .pathMatchers("/api/wallet/**").authenticated()
                 .pathMatchers("/api/returns/**").authenticated()
+                // Seller e-KYC: per-user scoped inside KycService (the evidence
+                // file endpoint additionally party-checks owner-or-staff).
+                .pathMatchers("/api/kyc/**").authenticated()
+                .pathMatchers("/api/verification/**").authenticated()
                 .anyExchange().authenticated();
     }
 }

@@ -20,6 +20,11 @@ public class UserDto {
     private String lastName;
     private User.UserRole role;
     private Boolean isActive;
+    private Boolean emailVerified;
+    private String phone;
+    private Boolean phoneVerified;
+    /** e-KYC outcome: true once identity verification passed (seller capability). */
+    private Boolean idVerified;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

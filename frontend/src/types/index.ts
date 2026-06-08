@@ -8,8 +8,22 @@ export interface User {
   lastName: string;
   role: UserRole;
   isActive?: boolean;
+  /** Mandatory contact verification (gates checkout / orders / KYC). */
+  emailVerified?: boolean;
+  phone?: string | null;
+  phoneVerified?: boolean;
+  /** e-KYC outcome: true once identity verification passed (seller capability). */
+  idVerified?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VerificationStatus {
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  fullyVerified: boolean;
+  email: string;
+  phone?: string | null;
 }
 
 export type UserRole = 'CUSTOMER' | 'ADMIN' | 'MANAGER' | 'VENDOR';
@@ -355,6 +369,76 @@ export interface WalletTransaction {
   referenceType: WalletReferenceType;
   referenceId?: string | null;
   description?: string;
+  createdAt: string;
+}
+
+// ---- Seller e-KYC ----
+
+export type SellerType = 'BUSINESS' | 'INDIVIDUAL';
+export type IdDocumentType = 'NATIONAL_ID' | 'PASSPORT' | 'DRIVING_LICENSE';
+export type KycStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'CHECKING'
+  | 'IN_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'EXPIRED';
+export type FaceVerdict = 'UNKNOWN' | 'MATCH' | 'NO_MATCH';
+export type KycDocType =
+  | 'ID_FRONT'
+  | 'ID_BACK'
+  | 'SELFIE_FRONT'
+  | 'SELFIE_LEFT'
+  | 'SELFIE_RIGHT'
+  | 'UTILITY_BILL';
+
+export interface SellerProfile {
+  id?: string;
+  userId?: string;
+  sellerType: SellerType;
+  legalName: string;
+  dateOfBirth?: string | null;
+  phone?: string | null;
+  idDocumentType: IdDocumentType;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state?: string | null;
+  postalCode?: string | null;
+  countryCode: string;
+}
+
+export interface KycDocumentMeta {
+  id: string;
+  caseId: string;
+  docType: KycDocType;
+  contentType?: string;
+  sizeBytes?: number;
+  createdAt: string;
+}
+
+export interface KycCase {
+  id: string;
+  userId: string;
+  status: KycStatus;
+  nameMatchScore?: number | null;
+  addressMatchScore?: number | null;
+  faceVerdict?: FaceVerdict;
+  idDocumentOk?: boolean | null;
+  billDocumentOk?: boolean | null;
+  /** Reviewer-only; null for owners and after the evidence purge. */
+  extractedIdText?: string | null;
+  extractedBillText?: string | null;
+  faceNote?: string | null;
+  submittedAt?: string | null;
+  /** 72h evidence retention deadline. */
+  expiresAt?: string | null;
+  autoDecided?: boolean;
+  decidedAt?: string | null;
+  rejectionReason?: string | null;
+  documentsPurgedAt?: string | null;
+  documents: KycDocumentMeta[];
   createdAt: string;
 }
 

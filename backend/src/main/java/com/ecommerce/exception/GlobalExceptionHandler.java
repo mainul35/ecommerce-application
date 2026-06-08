@@ -63,6 +63,21 @@ public class GlobalExceptionHandler {
         return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error));
     }
 
+    @ExceptionHandler(VerificationRequiredException.class)
+    public Mono<ResponseEntity<ErrorResponse>> handleVerificationRequiredException(
+            VerificationRequiredException ex, ServerWebExchange exchange) {
+        log.warn("Verification required: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .path(exchange.getRequest().getPath().value())
+                .build();
+
+        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).body(error));
+    }
+
     @ExceptionHandler(InsufficientStockException.class)
     public Mono<ResponseEntity<ErrorResponse>> handleInsufficientStockException(
             InsufficientStockException ex, ServerWebExchange exchange) {

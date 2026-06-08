@@ -31,6 +31,13 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
+        <!-- Email (account verification). JavaMailSender is blocking - sends are
+             dispatched on boundedElastic. Dev SMTP target is Mailpit. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- R2DBC for Reactive Database Access -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -125,6 +132,15 @@
             <groupId>com.stripe</groupId>
             <artifactId>stripe-java</artifactId>
             <version>29.0.0</version>
+        </dependency>
+
+        <!-- Tesseract OCR (local e-KYC document text extraction).
+             Requires traineddata files on disk (kyc.ocr.tessdata-path);
+             when absent, OCR degrades gracefully to the human review queue. -->
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>5.11.0</version>
         </dependency>
 
         <!-- DevTools -->

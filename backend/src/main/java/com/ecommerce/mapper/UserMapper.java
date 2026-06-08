@@ -17,5 +17,7 @@ public interface UserMapper {
     @Mapping(target = "role", expression = "java(com.ecommerce.model.User.UserRole.CUSTOMER)")
     @Mapping(target = "isActive", expression = "java(true)")
     @Mapping(target = "emailVerified", expression = "java(false)")
+    @Mapping(target = "phoneVerified", expression = "java(false)")
+    @Mapping(target = "idVerified", expression = "java(false)")
     User toEntity(RegisterRequest request);
 }

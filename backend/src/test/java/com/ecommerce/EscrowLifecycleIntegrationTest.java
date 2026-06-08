@@ -250,6 +250,7 @@ class EscrowLifecycleIntegrationTest {
                 .role(role)
                 .isActive(true)
                 .emailVerified(true)
+                .phoneVerified(true)   // buyers must be verified to check out
                 .build()).block();
         assertThat(user).isNotNull();
         return user;

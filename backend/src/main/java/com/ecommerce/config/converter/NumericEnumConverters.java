@@ -4,9 +4,13 @@ import com.ecommerce.model.Dispute;
 import com.ecommerce.model.DisputeAttachment;
 import com.ecommerce.model.DisputeMessage;
 import com.ecommerce.model.EscrowTransaction;
+import com.ecommerce.model.KycCase;
+import com.ecommerce.model.KycDocument;
 import com.ecommerce.model.NumericEnum;
 import com.ecommerce.model.Order;
 import com.ecommerce.model.ReturnRequest;
+import com.ecommerce.model.SellerProfile;
+import com.ecommerce.model.VerificationToken;
 import com.ecommerce.model.WalletTransaction;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.ReadingConverter;
@@ -42,7 +46,13 @@ public final class NumericEnumConverters {
                 new WalletTxTypeWriter(), new WalletTxTypeReader(),
                 new WalletRefTypeWriter(), new WalletRefTypeReader(),
                 new ReturnStatusWriter(), new ReturnStatusReader(),
-                new RefundDestinationWriter(), new RefundDestinationReader()
+                new RefundDestinationWriter(), new RefundDestinationReader(),
+                new SellerTypeWriter(), new SellerTypeReader(),
+                new IdDocumentTypeWriter(), new IdDocumentTypeReader(),
+                new KycStatusWriter(), new KycStatusReader(),
+                new FaceVerdictWriter(), new FaceVerdictReader(),
+                new KycDocTypeWriter(), new KycDocTypeReader(),
+                new VerificationChannelWriter(), new VerificationChannelReader()
         );
     }
 
@@ -173,6 +183,88 @@ public final class NumericEnumConverters {
     public static class RefundDestinationReader implements Converter<Number, ReturnRequest.RefundDestination> {
         @Override public ReturnRequest.RefundDestination convert(Number source) {
             return NumericEnum.fromCode(ReturnRequest.RefundDestination.class, source.intValue());
+        }
+    }
+
+    // ---- SellerProfile.SellerType ----
+    @WritingConverter
+    public static class SellerTypeWriter implements Converter<SellerProfile.SellerType, Integer> {
+        @Override public Integer convert(SellerProfile.SellerType source) { return source.getCode(); }
+    }
+
+    @ReadingConverter
+    public static class SellerTypeReader implements Converter<Number, SellerProfile.SellerType> {
+        @Override public SellerProfile.SellerType convert(Number source) {
+            return NumericEnum.fromCode(SellerProfile.SellerType.class, source.intValue());
+        }
+    }
+
+    // ---- SellerProfile.IdDocumentType ----
+    @WritingConverter
+    public static class IdDocumentTypeWriter implements Converter<SellerProfile.IdDocumentType, Integer> {
+        @Override public Integer convert(SellerProfile.IdDocumentType source) { return source.getCode(); }
+    }
+
+    @ReadingConverter
+    public static class IdDocumentTypeReader implements Converter<Number, SellerProfile.IdDocumentType> {
+        @Override public SellerProfile.IdDocumentType convert(Number source) {
+            return NumericEnum.fromCode(SellerProfile.IdDocumentType.class, source.intValue());
+        }
+    }
+
+    // ---- KycCase.KycStatus ----
+    @WritingConverter
+    public static class KycStatusWriter implements Converter<KycCase.KycStatus, Integer> {
+        @Override public Integer convert(KycCase.KycStatus source) { return source.getCode(); }
+    }
+
+    @ReadingConverter
+    public static class KycStatusReader implements Converter<Number, KycCase.KycStatus> {
+        @Override public KycCase.KycStatus convert(Number source) {
+            return NumericEnum.fromCode(KycCase.KycStatus.class, source.intValue());
+        }
+    }
+
+    // ---- KycCase.FaceVerdict ----
+    @WritingConverter
+    public static class FaceVerdictWriter implements Converter<KycCase.FaceVerdict, Integer> {
+        @Override public Integer convert(KycCase.FaceVerdict source) { return source.getCode(); }
+    }
+
+    @ReadingConverter
+    public static class FaceVerdictReader implements Converter<Number, KycCase.FaceVerdict> {
+        @Override public KycCase.FaceVerdict convert(Number source) {
+            return NumericEnum.fromCode(KycCase.FaceVerdict.class, source.intValue());
+        }
+    }
+
+    // ---- KycDocument.KycDocType ----
+    @WritingConverter
+    public static class KycDocTypeWriter implements Converter<KycDocument.KycDocType, Integer> {
+        @Override public Integer convert(KycDocument.KycDocType source) { return source.getCode(); }
+    }
+
+    @ReadingConverter
+    public static class KycDocTypeReader implements Converter<Number, KycDocument.KycDocType> {
+        @Override public KycDocument.KycDocType convert(Number source) {
+            return NumericEnum.fromCode(KycDocument.KycDocType.class, source.intValue());
+        }
+    }
+
+    // ---- VerificationToken.VerificationChannel ----
+    @WritingConverter
+    public static class VerificationChannelWriter
+            implements Converter<VerificationToken.VerificationChannel, Integer> {
+        @Override public Integer convert(VerificationToken.VerificationChannel source) {
+            return source.getCode();
+        }
+    }
+
+    @ReadingConverter
+    public static class VerificationChannelReader
+            implements Converter<Number, VerificationToken.VerificationChannel> {
+        @Override public VerificationToken.VerificationChannel convert(Number source) {
+            return NumericEnum.fromCode(VerificationToken.VerificationChannel.class, source.intValue());
         }
     }
 }

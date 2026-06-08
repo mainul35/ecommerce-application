@@ -20,6 +20,17 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  # Account verification email. Dev default targets Mailpit (docker-compose):
+  # SMTP on 1025, web inbox on http://localhost:8025. No auth in dev.
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -53,6 +64,37 @@ escrow:
   protection-days: ${ESCROW_PROTECTION_DAYS:7}
   release-interval-ms: ${ESCROW_RELEASE_INTERVAL_MS:300000}   # 5 minutes
   release-initial-delay-ms: 90000
+
+# Mandatory account verification. Email is real (sent via spring.mail above).
+# Phone is a DUMMY OTP for now - real bulk SMS needs a paid subscription, so
+# the OTP is logged and a fixed code is always accepted. Set phone-dummy=false
+# and wire a real SMS provider to go live.
+verification:
+  from-email: ${VERIFICATION_FROM_EMAIL:no-reply@ecommerce.local}
+  email-ttl-hours: ${VERIFICATION_EMAIL_TTL_HOURS:24}
+  phone-otp-ttl-minutes: ${VERIFICATION_PHONE_TTL_MINUTES:10}
+  phone-dummy: ${VERIFICATION_PHONE_DUMMY:true}
+  dummy-phone-otp: ${VERIFICATION_DUMMY_OTP:000000}
+
+# Seller e-KYC: photo-ID + selfies + utility-bill verification.
+# Evidence is TRANSIENT: purged on decision or after retention-hours (72h cap).
+# OCR needs Tesseract traineddata on disk (https://github.com/tesseract-ocr/tessdata_fast):
+#   download eng.traineddata (+ ben.traineddata for Bangla NIDs) into KYC_TESSDATA_PATH.
+# Face comparison uses the local Ollama vision model: ollama pull llava
+# When either engine is missing, cases route to the admin review queue instead of failing.
+kyc:
+  storage-dir: ${KYC_STORAGE_DIR:kyc-private}   # PRIVATE - never served via /uploads
+  retention-hours: ${KYC_RETENTION_HOURS:72}
+  purge-interval-ms: ${KYC_PURGE_INTERVAL_MS:600000}   # 10 minutes
+  ocr:
+    tessdata-path: ${KYC_TESSDATA_PATH:}
+    languages: ${KYC_OCR_LANGUAGES:eng}
+  vision:
+    model: ${KYC_VISION_MODEL:llava}
+    timeout-seconds: ${KYC_VISION_TIMEOUT_SECONDS:120}
+  thresholds:
+    name-match: ${KYC_NAME_MATCH_THRESHOLD:0.80}
+    address-match: ${KYC_ADDRESS_MATCH_THRESHOLD:0.70}
 
 # Stripe payment integration. Replace placeholders with sk_test_... and whsec_... keys.
 stripe:

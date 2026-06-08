@@ -142,6 +142,18 @@ export function Navbar() {
                       Wallet
                     </Link>
                   </li>
+                  <li>
+                    <Link className="dropdown-item" to="/sell">
+                      {user?.idVerified ? (
+                        <>
+                          Seller Center{' '}
+                          <i className="bi bi-patch-check-fill text-primary"></i>
+                        </>
+                      ) : (
+                        'Become a Seller'
+                      )}
+                    </Link>
+                  </li>
                   {canAccessAdmin(user) && (
                     <>
                       <li>

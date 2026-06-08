@@ -31,6 +31,7 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final VerificationService verificationService;
 
     public Mono<AuthResponse> register(RegisterRequest request) {
         return userRepository.existsByEmail(request.getEmail())
@@ -41,7 +42,12 @@ public class UserService {
                     User user = userMapper.toEntity(request);
                     user.setId(UUID.randomUUID());
                     user.setPassword(passwordEncoder.encode(request.getPassword()));
-                    return userRepository.save(user);
+                    return userRepository.save(user)
+                            // Fire the email verification link immediately on signup.
+                            // Best-effort: a mail failure must not fail registration.
+                            .flatMap(saved -> verificationService.sendEmailVerification(saved)
+                                    .onErrorResume(e -> Mono.empty())
+                                    .thenReturn(saved));
                 })
                 .map(user -> AuthResponse.builder()
                         .user(userMapper.toDto(user))
@@ -50,11 +56,13 @@ public class UserService {
     }
 
     /**
-     * Customer-side login. Rejects ADMIN/VENDOR users with a generic
-     * {@code Invalid credentials} message - they MUST use the admin login flow.
+     * Customer-side login. Accepts CUSTOMER and VENDOR accounts - sellers
+     * are storefront users too. Rejects ADMIN/MANAGER with a generic
+     * {@code Invalid credentials} message - staff MUST use the admin login flow.
      */
     public Mono<AuthResponse> login(LoginRequest request) {
-        return authenticate(request, role -> role == User.UserRole.CUSTOMER);
+        return authenticate(request, role -> role == User.UserRole.CUSTOMER
+                || role == User.UserRole.VENDOR);
     }
 
     /**
