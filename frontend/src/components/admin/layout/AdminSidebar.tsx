@@ -22,6 +22,7 @@ const navItems: NavItem[] = [
   { to: '/admin/escrow', label: 'Escrow', icon: 'bi-shield-lock', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/disputes', label: 'Disputes', icon: 'bi-chat-square-text', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/returns', label: 'Returns', icon: 'bi-arrow-counterclockwise', visibleFor: ({ isAdminUser }) => isAdminUser },
+  { to: '/admin/kyc', label: 'KYC Review', icon: 'bi-person-badge', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/currencies', label: 'Currencies', icon: 'bi-currency-exchange', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/regions', label: 'Regions', icon: 'bi-globe', visibleFor: ({ isAdminUser }) => isAdminUser },
   { to: '/admin/managers', label: 'Managers', icon: 'bi-people', visibleFor: ({ isAdminUser }) => isAdminUser },

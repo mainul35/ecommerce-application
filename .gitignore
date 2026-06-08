@@ -7,6 +7,9 @@ backend/HELP.md
 # either the repo root or backend/.
 backend/config/
 /config/
+# Tesseract OCR traineddata for KYC — large binary models (~25MB), not source.
+# Download per the README setup step; keep them out of git history.
+backend/src/main/resources/test_data/
 *.class
 *.jar
 *.war
