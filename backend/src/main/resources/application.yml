@@ -41,15 +41,41 @@ logging:
     org.springframework.r2dbc: DEBUG
 
 jwt:
+  # DEV-ONLY placeholder secret. MUST be overridden via JWT_SECRET in every shared
+  # environment - see docs/POST_DEPLOYMENT_SECRETS.md. Anyone with this value can
+  # forge tokens for any user, including ADMIN.
   secret: ${JWT_SECRET:your-256-bit-secret-key-for-jwt-signing-must-be-at-least-32-characters}
-  expiration: ${JWT_EXPIRATION:86400000}
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  # Short-lived ACCESS token (default 1h). The frontend silently exchanges the
+  # refresh token for a new access token on 401, so a leaked access token is only
+  # useful for a short window. Lower further (e.g. 900000 = 15m) for stricter posture.
+  expiration: ${JWT_EXPIRATION:3600000}          # 1 hour
+  # Longer-lived REFRESH token (default 7 days). Accepted only at the refresh
+  # endpoints; never authenticates a normal request.
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}   # 7 days
 
 cors:
+  # General API origins (storefront + admin apps). Public endpoints must be
+  # reachable from both, so both ports are listed.
   allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:3000}
+  # Admin API origins - ONLY the standalone admin dashboard (5174). The admin
+  # surface (/api/admin/**) rejects any other origin at the browser (CORS) layer,
+  # so storefront-origin JS cannot call admin APIs even before the token check.
+  admin-origins: ${CORS_ADMIN_ORIGINS:http://localhost:5174}
   allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
   allowed-headers: "*"
   allow-credentials: true
+
+# Fallback admin seeded on first boot. DEV defaults are guessable (admin/secret)
+# and exist only so a fresh machine has a login. In production either set a strong
+# ADMIN_BOOTSTRAP_PASSWORD or disable this entirely (enabled=false) and rely on a
+# vault-provisioned admin. See docs/POST_DEPLOYMENT_SECRETS.md.
+admin:
+  bootstrap:
+    enabled: ${ADMIN_BOOTSTRAP_ENABLED:true}
+    email: ${ADMIN_BOOTSTRAP_EMAIL:admin}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:secret}
+    first-name: ${ADMIN_BOOTSTRAP_FIRST_NAME:System}
+    last-name: ${ADMIN_BOOTSTRAP_LAST_NAME:Administrator}
 
 # Stock reservation: how long a PENDING order holds stock before auto-cancel.
 reservation:
@@ -64,6 +90,26 @@ escrow:
   protection-days: ${ESCROW_PROTECTION_DAYS:7}
   release-interval-ms: ${ESCROW_RELEASE_INTERVAL_MS:300000}   # 5 minutes
   release-initial-delay-ms: 90000
+
+# Object storage for product media (PUBLIC) and dispute evidence (PRIVATE).
+# provider=local (default) uses the filesystem; provider=s3 uses MinIO/AWS S3
+# (required once the backend runs >1 replica - local disk isn't shared).
+# See docs/DEPLOYMENT_PLAYBOOK.md §8. KYC evidence still uses its own local
+# store (kyc.storage-dir) pending a download-to-temp layer for the OCR/vision engines.
+storage:
+  provider: ${STORAGE_PROVIDER:local}
+  local:
+    # PUBLIC media reuses app.upload-dir (served by /uploads/**); this is the
+    # PRIVATE root for streamed evidence (dispute attachments).
+    private-dir: ${STORAGE_PRIVATE_DIR:private-storage}
+  s3:
+    endpoint: ${S3_ENDPOINT:}            # e.g. http://minio:9000 (blank = real AWS S3)
+    region: ${S3_REGION:us-east-1}
+    bucket: ${S3_BUCKET:ecommerce-media}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    path-style-access: ${S3_PATH_STYLE:true}
+    public-base-url: ${S3_PUBLIC_BASE_URL:}   # public serving base for product media
 
 # Mandatory account verification. Email is real (sent via spring.mail above).
 # Phone is a DUMMY OTP for now - real bulk SMS needs a paid subscription, so
@@ -115,8 +161,12 @@ app:
   backend-url: ${BACKEND_URL:http://localhost:8080}
 
 ollama:
-  # Base URL of the local Ollama server. In production, point to your hosted instance.
+  # Base URL of the Ollama server. Local dev: http://localhost:11434.
+  # Hosted (Ollama Cloud) for KYC vision without a local GPU: set OLLAMA_URL to the
+  # cloud endpoint and OLLAMA_API_KEY to your key (see docs/DEPLOYMENT_PLAYBOOK.md §14).
   url: ${OLLAMA_URL:http://localhost:11434}
+  # Bearer token for hosted inference. Blank for a local server (no auth needed).
+  api-key: ${OLLAMA_API_KEY:}
   # Embedding model pulled in Ollama. Run: ollama pull nomic-embed-text
   # For better multilingual support (JP/TH): ollama pull mxbai-embed-large (change dimensions to 1024)
   model: ${OLLAMA_EMBED_MODEL:nomic-embed-text}

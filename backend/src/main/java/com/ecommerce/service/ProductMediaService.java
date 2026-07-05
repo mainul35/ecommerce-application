@@ -5,18 +5,14 @@ import com.ecommerce.exception.BadRequestException;
 import com.ecommerce.exception.ResourceNotFoundException;
 import com.ecommerce.model.ProductMedia;
 import com.ecommerce.repository.ProductMediaRepository;
+import com.ecommerce.service.storage.StorageArea;
+import com.ecommerce.service.storage.StorageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,9 +30,7 @@ public class ProductMediaService {
             "video/mp4", "video/webm", "video/quicktime");
 
     private final ProductMediaRepository mediaRepository;
-
-    @Value("${app.upload-dir:uploads}")
-    private String uploadDir;
+    private final StorageService storage;
 
     public Mono<ProductMediaDto> upload(UUID productId, FilePart filePart) {
         String rawType = filePart.headers().getContentType() != null
@@ -57,31 +51,20 @@ public class ProductMediaService {
         String originalName = filePart.filename();
         String ext = extension(originalName);
         String storedName = UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
-        Path dir = Paths.get(uploadDir, "products", productId.toString());
-        Path filePath = dir.resolve(storedName);
-        String url = "/uploads/products/" + productId + "/" + storedName;
+        String key = "products/" + productId + "/" + storedName;
         final String finalContentType = contentType;
 
-        return Mono.fromCallable(() -> {
-                    Files.createDirectories(dir);
-                    return filePath;
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                // transferTo writes DataBuffers to disk; run on boundedElastic to avoid blocking the event loop
-                .flatMap(path -> filePart.transferTo(path)
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(path))
-                .flatMap(path -> Mono.fromCallable(() -> {
-                    long size = Files.size(path);
+        return storage.store(StorageArea.PUBLIC, key, filePart, contentType)
+                .flatMap(size -> {
                     long maxBytes = "VIDEO".equals(mediaType) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
                     if (size > maxBytes) {
-                        Files.delete(path);
-                        throw new BadRequestException("VIDEO".equals(mediaType)
-                                ? "Video exceeds 100 MB limit"
-                                : "Image exceeds 10 MB limit");
+                        return storage.delete(StorageArea.PUBLIC, key)
+                                .then(Mono.error(new BadRequestException("VIDEO".equals(mediaType)
+                                        ? "Video exceeds 100 MB limit"
+                                        : "Image exceeds 10 MB limit")));
                     }
-                    return size;
-                }).subscribeOn(Schedulers.boundedElastic()))
+                    return Mono.just(size);
+                })
                 .flatMap(size -> mediaRepository.countByProductId(productId)
                         .flatMap(count -> {
                             ProductMedia media = new ProductMedia();
@@ -90,7 +73,7 @@ public class ProductMediaService {
                             media.setFileName(storedName);
                             media.setOriginalName(originalName);
                             media.setMediaType(mediaType);
-                            media.setUrl(url);
+                            media.setUrl(storage.publicUrl(key));
                             media.setContentType(finalContentType);
                             media.setSizeBytes(size);
                             media.setSortOrder(count.intValue());
@@ -109,12 +92,9 @@ public class ProductMediaService {
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Media not found")))
                 .filter(m -> productId.equals(m.getProductId()))
                 .switchIfEmpty(Mono.error(new ResourceNotFoundException("Media not found")))
-                .flatMap(media -> Mono.fromCallable(() -> {
-                    Path path = Paths.get(uploadDir, "products", productId.toString(), media.getFileName());
-                    Files.deleteIfExists(path);
-                    return media;
-                }).subscribeOn(Schedulers.boundedElastic()))
-                .flatMap(mediaRepository::delete);
+                .flatMap(media -> storage.delete(StorageArea.PUBLIC,
+                                "products/" + productId + "/" + media.getFileName())
+                        .then(mediaRepository.delete(media)));
     }
 
     public Mono<Void> reorder(UUID productId, List<UUID> orderedIds) {
@@ -145,17 +125,8 @@ public class ProductMediaService {
         return dot >= 0 ? filename.substring(dot + 1).toLowerCase() : "";
     }
 
-    /** Cleanup helper: delete all files on disk when a product is deleted. */
+    /** Cleanup helper: delete all of a product's media files when the product is deleted. */
     public Mono<Void> deleteAllForProduct(UUID productId) {
-        return mediaRepository.findByProductIdOrderBySortOrderAsc(productId)
-                .flatMap(media -> Mono.fromCallable(() -> {
-                    Path path = Paths.get(uploadDir, "products", productId.toString(), media.getFileName());
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException ignored) {
-                    }
-                    return media;
-                }).subscribeOn(Schedulers.boundedElastic()))
-                .then();
+        return storage.deletePrefix(StorageArea.PUBLIC, "products/" + productId);
     }
 }

@@ -4,8 +4,15 @@ import type { ProductMedia } from '../../types';
 /** Derives the backend origin from the configured API base URL. */
 const BACKEND_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/api\/?$/, '');
 
-/** Converts a relative media URL (e.g. /uploads/products/…) to a full src URL. */
+/**
+ * Converts a stored media URL to a full src URL. Local storage yields a relative
+ * path (/uploads/products/…) that is prefixed with the backend origin; S3/MinIO
+ * yields an absolute public URL (http…) which is used as-is.
+ */
 export function mediaUrl(relativeUrl: string): string {
+  if (/^https?:\/\//i.test(relativeUrl)) {
+    return relativeUrl;
+  }
   return `${BACKEND_ORIGIN}${relativeUrl}`;
 }
 

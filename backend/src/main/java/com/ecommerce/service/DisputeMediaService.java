@@ -3,24 +3,26 @@ package com.ecommerce.service;
 import com.ecommerce.exception.BadRequestException;
 import com.ecommerce.model.DisputeAttachment;
 import com.ecommerce.repository.DisputeAttachmentRepository;
+import com.ecommerce.service.storage.StorageArea;
+import com.ecommerce.service.storage.StorageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Stores image/video evidence attached to dispute messages, mirroring the
- * ProductMediaService upload rules (type allow-list + size caps). Files land
- * under {upload-dir}/disputes/{disputeId}/ and are served at
- * /uploads/disputes/** (authenticated - see AccessRules).
+ * Stores image/video evidence attached to dispute messages (type allow-list + size
+ * caps), through the {@link StorageService} PRIVATE area.
+ *
+ * SECURITY: evidence is sensitive, so it lives in PRIVATE storage (never the public
+ * /uploads static handler) and is only ever streamed back through the party-checked
+ * endpoint {@code GET /api/disputes/{disputeId}/attachments/{attachmentId}/file}
+ * (see DisputeService#attachmentForViewer). Keys are {@code disputes/{disputeId}/{file}}.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,9 +37,7 @@ public class DisputeMediaService {
             "video/mp4", "video/webm", "video/quicktime");
 
     private final DisputeAttachmentRepository attachmentRepository;
-
-    @Value("${app.upload-dir:uploads}")
-    private String uploadDir;
+    private final StorageService storage;
 
     public Mono<DisputeAttachment> store(UUID disputeId, UUID messageId, FilePart filePart) {
         String rawType = filePart.headers().getContentType() != null
@@ -57,33 +57,28 @@ public class DisputeMediaService {
         String originalName = filePart.filename();
         String ext = extension(originalName);
         String storedName = UUID.randomUUID() + (ext.isEmpty() ? "" : "." + ext);
-        Path dir = Paths.get(uploadDir, "disputes", disputeId.toString());
-        Path filePath = dir.resolve(storedName);
-        String url = "/uploads/disputes/" + disputeId + "/" + storedName;
+        // Pre-generate the attachment id so the stored URL points straight at the
+        // party-checked streaming endpoint for this exact row.
+        UUID attachmentId = UUID.randomUUID();
+        String key = key(disputeId, storedName);
+        String url = "/api/disputes/" + disputeId + "/attachments/" + attachmentId + "/file";
         final String finalContentType = contentType;
 
-        return Mono.fromCallable(() -> {
-                    Files.createDirectories(dir);
-                    return filePath;
-                })
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(path -> filePart.transferTo(path)
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(path))
-                .flatMap(path -> Mono.fromCallable(() -> {
-                    long size = Files.size(path);
+        return storage.store(StorageArea.PRIVATE, key, filePart, contentType)
+                .flatMap(size -> {
                     long maxBytes = attachmentType == DisputeAttachment.AttachmentType.VIDEO
                             ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
                     if (size > maxBytes) {
-                        Files.delete(path);
-                        throw new BadRequestException(attachmentType == DisputeAttachment.AttachmentType.VIDEO
-                                ? "Video exceeds 100 MB limit"
-                                : "Image exceeds 10 MB limit");
+                        return storage.delete(StorageArea.PRIVATE, key)
+                                .then(Mono.error(new BadRequestException(
+                                        attachmentType == DisputeAttachment.AttachmentType.VIDEO
+                                                ? "Video exceeds 100 MB limit"
+                                                : "Image exceeds 10 MB limit")));
                     }
-                    return size;
-                }).subscribeOn(Schedulers.boundedElastic()))
+                    return Mono.just(size);
+                })
                 .flatMap(size -> attachmentRepository.save(DisputeAttachment.builder()
-                        .id(UUID.randomUUID())
+                        .id(attachmentId)
                         .disputeMessageId(messageId)
                         .fileName(storedName)
                         .originalName(originalName)
@@ -92,6 +87,15 @@ public class DisputeMediaService {
                         .attachmentType(attachmentType)
                         .sizeBytes(size)
                         .build()));
+    }
+
+    /** Stream a stored file's bytes (for the party-checked viewer endpoint). */
+    public Flux<DataBuffer> read(UUID disputeId, String fileName) {
+        return storage.read(StorageArea.PRIVATE, key(disputeId, fileName));
+    }
+
+    private static String key(UUID disputeId, String fileName) {
+        return "disputes/" + disputeId + "/" + fileName;
     }
 
     private static String extension(String filename) {

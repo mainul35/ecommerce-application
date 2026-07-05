@@ -14,9 +14,21 @@ backend/src/main/resources/test_data/
 *.jar
 *.war
 
+# Runtime file storage — user uploads and private evidence. Never commit these.
+# Created under the app working dir, which may be repo root or backend/.
+uploads/
+backend/uploads/
+kyc-private/
+backend/kyc-private/
+dispute-private/
+backend/dispute-private/
+private-storage/
+backend/private-storage/
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/dist-admin/
 frontend/.vite/
 
 # Env / secrets

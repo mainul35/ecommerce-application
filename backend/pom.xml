@@ -22,6 +22,7 @@
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.5.0</springdoc.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <awssdk.version>2.28.16</awssdk.version>
     </properties>
 
     <dependencies>
@@ -141,6 +142,20 @@
             <groupId>net.sourceforge.tess4j</groupId>
             <artifactId>tess4j</artifactId>
             <version>5.11.0</version>
+        </dependency>
+
+        <!-- AWS SDK v2 - S3 async client. Powers the S3 StorageService (MinIO or AWS S3)
+             for product media + private evidence. Only instantiated when
+             storage.provider=s3; the default local provider needs none of this. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${awssdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>netty-nio-client</artifactId>
+            <version>${awssdk.version}</version>
         </dependency>
 
         <!-- DevTools -->
