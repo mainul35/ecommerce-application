@@ -1,22 +1,23 @@
 # Self-Hosted Infrastructure Plan
 
-Local-first, self-hosted deployment of the e-commerce ecosystem, evolving in three
-isolation phases toward a Proxmox home lab exposed globally via Cloudflare Tunnel.
-This document is the source of truth for topology, networking, TLS, CI/CD, secrets,
-AI, and scaling. It is intentionally incremental — start at Phase 1, grow as needed.
+Local-first, self-hosted deployment of the e-commerce ecosystem — the source of truth
+for topology, networking, TLS, CI/CD, secrets, AI, and scaling. It evolves in three
+isolation phases toward a Proxmox home lab exposed globally via Cloudflare Tunnel, and
+is intentionally incremental: start at Phase 1, grow as needed.
 
-> Ties into the app's security model: the admin dashboard is a separate app/origin
-> (see [POST_DEPLOYMENT_SECRETS.md](POST_DEPLOYMENT_SECRETS.md) and CLAUDE.md). This
-> plan maps that isolation onto real hosts, TLS, and network boundaries.
+> **Note:** This plan ties into the app's security model — the admin dashboard is a
+> separate app/origin (see [POST_DEPLOYMENT_SECRETS.md](POST_DEPLOYMENT_SECRETS.md) and
+> CLAUDE.md). It maps that isolation onto real hosts, TLS, and network boundaries.
 
-> **Update 2026-07-04 — current direction.** Proxmox is temporarily unavailable, so
-> **Phase 1 starts on WSL2 / Hyper-V with Docker Compose**, built portability-first to
-> lift-and-shift to Proxmox/AWS later — see the step-by-step
-> [DEPLOYMENT_PLAYBOOK.md](DEPLOYMENT_PLAYBOOK.md). **VM3 (local GPU) is dropped for
-> now**: no affordable local GPU, so KYC vision uses **hosted inference (Ollama
-> Cloud)** and embeddings a cheap hosted API — §9's "keep KYC local" is deferred until
-> volume/compliance justify a GPU box. Cloudflare domains are already owned (TLS via
-> DNS-01; public exposure via Cloudflare Tunnel).
+> **Note: Update 2026-07-04 — current direction.**
+> - Proxmox is temporarily unavailable, so **Phase 1 starts on WSL2 / Hyper-V with
+>   Docker Compose**, built portability-first to lift-and-shift to Proxmox/AWS later —
+>   see the step-by-step [DEPLOYMENT_PLAYBOOK.md](DEPLOYMENT_PLAYBOOK.md).
+> - **VM3 (local GPU) is dropped for now**: with no affordable local GPU, KYC vision
+>   uses **hosted inference (Ollama Cloud)** and embeddings use a cheap hosted API.
+>   §9's "keep KYC local" is deferred until volume/compliance justify a GPU box.
+> - Cloudflare domains are already owned (TLS via DNS-01; public exposure via
+>   Cloudflare Tunnel).
 
 ---
 
@@ -44,10 +45,12 @@ Nothing about the app or containers changes between phases — only the hypervis
 location, DNS, and the ingress edge change. Build P1 to be P3-ready (real hostnames,
 TLS, no reliance on `localhost`).
 
-**Hypervisor choice:** use **Proxmox VE** from the start. It's free, Linux-native,
-does snapshots/backup/clustering, and is exactly your Phase-2 target — standardizing
-now avoids a Hyper-V→Proxmox migration later. Hyper-V works for P1 if that's what you
-have today, but treat it as throwaway.
+**Hypervisor choice:** use **Proxmox VE** from the start.
+
+- It's free, Linux-native, and does snapshots/backup/clustering.
+- It's exactly your Phase-2 target, so standardizing now avoids a Hyper-V → Proxmox
+  migration later.
+- Hyper-V works for P1 if that's what you have today, but treat it as throwaway.
 
 ---
 
@@ -82,18 +85,19 @@ have today, but treat it as throwaway.
 ```
 
 ### VM1 — Applications (`app` VM)
-Runs the customer-facing ecosystem and **the only VM whose services are exposed**:
+Runs the customer-facing ecosystem and is **the only VM whose services are exposed**:
 - **Traefik** (or Caddy) — TLS termination + reverse proxy. Routes by hostname:
-  `shop.<domain>` → storefront, `admin.<domain>` → admin app, `api.<domain>` → backend.
+  `shop.example.com` → storefront, `admin.example.com` → admin app,
+  `api.example.com` → backend.
 - **storefront** — built Vite SPA served by nginx.
 - **admin** — the separate admin SPA (its own image + hostname; never bundled with storefront).
-- **backend** — Spring Boot; only reachable through Traefik at `api.<domain>`.
+- **backend** — Spring Boot; only reachable through Traefik at `api.example.com`.
 - **Postgres (pgvector)** — internal only, never exposed.
 - **App Vault** — app secrets (JWT key, DB password, Stripe/gateway keys, mail creds).
 - **MinIO** — S3-compatible object store for uploads and **private** KYC/dispute
   evidence (replaces local-disk storage; mandatory once the backend scales >1 replica).
 
-Only `shop`, `admin`, `api` (via Traefik) leave the VM. Everything else is
+Only `shop`, `admin`, and `api` (via Traefik) leave the VM. Everything else is
 compose-network-internal.
 
 ### VM2 — Infra / CI-CD (`infra` VM)
@@ -114,7 +118,7 @@ See §9. Backend reaches it via internal `OLLAMA_URL`; never exposed publicly.
 
 ## 4. Secrets topology — two vaults
 
-You asked for app-vs-infra separation; honor it with **two Vault instances**:
+App-vs-infra separation is honored with **two Vault instances**:
 
 | Vault | Host | Holds | Consumed by |
 |---|---|---|---|
@@ -180,7 +184,7 @@ GitHub push ─webhook→ Jenkins (VM2)
   local DNS (dnsmasq/AdGuard). Keep karimen's ports clear (host 5432/8080 taken →
   Postgres 5433, backend behind Traefik on 443).
 - **P2:** dedicated Proxmox box on the router; put the lab on its own subnet/VLAN;
-  run local DNS (AdGuard/Pi-hole or Proxmox) so `*.<domain>` resolves on the LAN.
+  run local DNS (AdGuard/Pi-hole or Proxmox) so `*.example.com` resolves on the LAN.
 - **P3:** no inbound ports on the router at all — `cloudflared` makes **outbound**
   tunnels to Cloudflare; public DNS is Cloudflare-managed.
 
@@ -193,7 +197,7 @@ GitHub push ─webhook→ Jenkins (VM2)
 | P1/P2 | **Let's Encrypt DNS-01** (via Traefik + your DNS provider's API token) OR **Vault PKI / step-ca** internal CA | DNS-01 gives *trusted* wildcard certs with no public inbound. Internal CA works too but you must trust its root on each device. |
 | P3 | **Cloudflare edge certs** | Cloudflare terminates TLS at its edge; origin uses a Cloudflare Origin cert or the tunnel's mTLS. |
 
-Terminate TLS at **Traefik** on each VM. Admin (`admin.<domain>`) additionally sits
+Terminate TLS at **Traefik** on each VM. Admin (`admin.example.com`) additionally sits
 behind **Cloudflare Access** in P3 (email OTP / SSO) — defense in depth over the
 app's own admin-audience token + CORS isolation.
 
@@ -216,11 +220,12 @@ and **search embeddings** (product text — not PII). Treat them differently:
   open embedding models (BGE, nomic, e5) pay-per-token. Point `OLLAMA_*`/embedding
   config at one of these, or keep them on VM3 too if you want zero external calls.
 
-**Cost guidance:** a dedicated GPU box is worth it only if (a) KYC/PII volume is real
-and must stay local, or (b) you're inferencing constantly. For a low-traffic launch,
-**keep KYC vision on your existing local Ollama and offload embeddings to a cheap
-hosted API** — buy the GPU box when KYC throughput justifies it. Keep the AI tier
-behind the LAN; never expose Ollama publicly.
+> **Tip:** A dedicated GPU box is worth it only if (a) KYC/PII volume is real and must
+> stay local, or (b) you're inferencing constantly. For a low-traffic launch, **keep
+> KYC vision on your existing local Ollama and offload embeddings to a cheap hosted
+> API** — buy the GPU box when KYC throughput justifies it.
+
+> **⚠️ Warning:** Keep the AI tier behind the LAN; never expose Ollama publicly.
 
 ---
 
@@ -265,7 +270,7 @@ In rough priority order as load grows:
 
 ## 12. Security notes (ties to the app hardening)
 
-- Admin gets its **own hostname** (`admin.<domain>`), behind **Cloudflare Access** in
+- Admin gets its **own hostname** (`admin.example.com`), behind **Cloudflare Access** in
   P3 — layered over the app's admin-audience JWT + `/api/admin/**` CORS lock.
 - Private evidence (KYC, disputes) → **MinIO with signed URLs**, never public buckets.
 - `CORS_ORIGINS` / `CORS_ADMIN_ORIGINS` / `VITE_ADMIN_URL` set per phase so origin
@@ -290,7 +295,7 @@ In rough priority order as load grows:
 1. **P1 skeleton:** VM1 (Traefik + backend + Postgres + Vault + MinIO + both SPAs) and
    VM2 (Harbor + Jenkins + Vault) as Compose stacks; internal-CA TLS; deploy by hand.
 2. **Wire CI/CD:** GitHub webhook → Jenkins → Harbor → SSH deploy to VM1.
-3. **Real TLS + local DNS:** Traefik DNS-01 wildcard; AdGuard/dnsmasq for `*.<domain>`.
+3. **Real TLS + local DNS:** Traefik DNS-01 wildcard; AdGuard/dnsmasq for `*.example.com`.
 4. **P2:** move VMs to dedicated Proxmox hardware on the router.
 5. **P3:** cloudflared tunnels + Cloudflare Access on admin.
 6. **Scale as needed** per §10, starting with MinIO (already required for >1 backend).

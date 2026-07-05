@@ -1,15 +1,33 @@
 # P1 Deployment Playbook — Docker Compose on WSL2 / Hyper-V
 
-A follow-it-yourself runbook to stand up the whole ecosystem as containers on your
-current machine (WSL2 or a Hyper-V Linux VM), with **real Cloudflare TLS** and a
-layout that lifts-and-shifts unchanged to Proxmox or AWS later.
+Stand up the whole app stack (Traefik + Postgres + MinIO + backend + two frontend SPAs)
+as Docker containers on your current machine (WSL2 or a Hyper-V Linux VM), with **real
+Cloudflare TLS** and a layout that lifts-and-shifts unchanged to Proxmox or AWS later.
 
 Companion docs: big-picture [INFRASTRUCTURE.md](INFRASTRUCTURE.md), secrets
 [POST_DEPLOYMENT_SECRETS.md](POST_DEPLOYMENT_SECRETS.md).
 
-**At the end you will have:** `https://shop.<domain>`, `https://admin.<domain>`,
-`https://api.<domain>` served by Traefik with trusted certs, backed by Postgres +
+> **Note:** Throughout this playbook the domain is written as `example.com`. Swap in
+> your real Cloudflare-managed domain everywhere you see it. Other `<...>` placeholders
+> are non-domain variables you fill in yourself.
+
+**What you'll have at the end:** `https://shop.example.com`, `https://admin.example.com`,
+and `https://api.example.com` served by Traefik with trusted certs, backed by Postgres +
 MinIO, all defined in one portable `deploy/` folder.
+
+**At a glance — the sections in execution order:**
+
+1. §0 Portability rules (design constraints — read once)
+2. §1 Prerequisites
+3. §2 Create the deploy folder
+4. §3 Backend image
+5. §4 Frontend image
+6. §5 The `.env` config file
+7. §6 The `docker-compose.yml`
+8. §7 Bring it up + verify
+9. §8 MinIO wiring
+10. §9–§10 LAN access, then public access via Cloudflare Tunnel
+11. §11–§16 Secrets, portability, scaling, AI/KYC, troubleshooting, execution order
 
 ---
 
@@ -22,7 +40,7 @@ MinIO, all defined in one portable `deploy/` folder.
 3. **State lives in named volumes** (Postgres data, MinIO data, Traefik certs), never
    in host bind-mounts to Windows paths. Named volumes are portable and backup-able.
 4. **No `localhost` anywhere in the app** — always the real hostname
-   (`api.<domain>`), so the same images work on WSL, Proxmox, and AWS.
+   (`api.example.com`), so the same images work on WSL, Proxmox, and AWS.
 5. **Images are built once and referenced by tag.** Locally you can `build:`; when you
    add Harbor/GHCR you just change the `image:` reference.
 
@@ -32,26 +50,31 @@ Keep the whole `deploy/` folder in git. That folder *is* your infrastructure.
 
 ## 1. Prerequisites
 
-- **Docker** in WSL2 (Docker Desktop with WSL2 backend, or Docker Engine installed
-  inside an Ubuntu WSL distro). Verify: `docker version && docker compose version`.
-- **A Cloudflare-managed domain** (you have this). You'll use DNS-01 for certs.
-- **A Cloudflare API token** scoped to *Zone → DNS → Edit* for your zone
-  (Cloudflare dashboard → My Profile → API Tokens → Create → "Edit zone DNS"). This
-  lets Traefik prove domain ownership **without opening any inbound port**.
-- Pick your hostnames (used everywhere below):
-  - `shop.<domain>` → storefront
-  - `admin.<domain>` → admin console
-  - `api.<domain>` → backend API
+Have all of these ready before you start:
 
-> **WSL2 networking note.** WSL2 forwards `localhost` to Windows, so from the same PC
-> you reach the stack fine. Reaching it from *other* LAN devices via WSL2 is awkward
-> (needs `netsh portproxy`). If you want LAN access now, run the stack in a **Hyper-V
-> Ubuntu VM** (bridged network) instead — the compose files are identical. For "just
-> me on this machine," WSL2 is fine.
+- [ ] **Docker** in WSL2 — either Docker Desktop with the WSL2 backend, or Docker Engine
+  installed inside an Ubuntu WSL distro. Verify with `docker version && docker compose version`.
+- [ ] **A Cloudflare-managed domain.** Certs are issued via the DNS-01 challenge.
+- [ ] **A Cloudflare API token** scoped to *Zone → DNS → Edit* for your zone. Create it at
+  Cloudflare dashboard → My Profile → API Tokens → Create → "Edit zone DNS". This lets
+  Traefik prove domain ownership **without opening any inbound port**.
+- [ ] **Your three hostnames chosen** (used everywhere below):
+  - `shop.example.com` → storefront
+  - `admin.example.com` → admin console
+  - `api.example.com` → backend API
+
+> **Note:** WSL2 vs Hyper-V. WSL2 forwards `localhost` to Windows, so you reach the stack
+> fine from the same PC. Reaching it from *other* LAN devices via WSL2 is awkward (needs
+> `netsh portproxy`). If you want LAN access now, run the stack in a **Hyper-V Ubuntu VM**
+> (bridged network) instead — the compose files are identical. For "just me on this
+> machine," WSL2 is fine.
 
 ---
 
 ## 2. Create the deploy folder
+
+Create this layout inside your repo. Everything infra-related lives under `deploy/` so
+the whole stack is one portable, git-tracked folder.
 
 ```
 ecommerce-application/
@@ -78,6 +101,8 @@ Add to `.gitignore`: `deploy/.env`, `deploy/traefik/acme.json`.
 Multi-stage: build the jar with Maven, run on a slim JRE. (No `mvnw` needed — the
 build image provides Maven.)
 
+Create `backend/Dockerfile` with this content:
+
 ```dockerfile
 # ---- build ----
 FROM maven:3.9-eclipse-temurin-21 AS build
@@ -95,9 +120,9 @@ EXPOSE 8080
 ENTRYPOINT ["java","-jar","/app/app.jar"]
 ```
 
-> KYC OCR needs Tesseract traineddata (the gitignored ~25 MB files). For containers,
-> mount them as a volume (see compose `backend.volumes`) and set `KYC_TESSDATA_PATH`
-> to the mount path — don't bake PII-adjacent blobs into the image.
+> **Note:** KYC OCR needs Tesseract traineddata (the gitignored ~25 MB files). For
+> containers, mount them as a volume (see compose `backend.volumes`) and set
+> `KYC_TESSDATA_PATH` to the mount path — don't bake PII-adjacent blobs into the image.
 
 ---
 
@@ -106,6 +131,8 @@ ENTRYPOINT ["java","-jar","/app/app.jar"]
 Both SPAs build from the same source with different commands and nginx roots. Vite
 reads `VITE_*` from the environment at **build time**, so the API/admin URLs are
 passed as build args.
+
+Create `frontend/Dockerfile` with this content:
 
 ```dockerfile
 # ---- shared build base ----
@@ -136,7 +163,8 @@ COPY --from=admin-build /app/dist-admin /usr/share/nginx/html
 COPY deploy/nginx/admin.conf /etc/nginx/conf.d/default.conf
 ```
 
-`deploy/nginx/storefront.conf`:
+Create `deploy/nginx/storefront.conf` — serves the storefront SPA and falls back to
+`index.html` for client-side routes:
 ```nginx
 server {
   listen 80;
@@ -145,7 +173,8 @@ server {
 }
 ```
 
-`deploy/nginx/admin.conf` (admin entry is `admin.html`, not `index.html`):
+Create `deploy/nginx/admin.conf` — same, but the admin entry point is `admin.html`,
+not `index.html`:
 ```nginx
 server {
   listen 80;
@@ -157,6 +186,9 @@ server {
 ---
 
 ## 5. The `.env` — single source of config (`deploy/.env.example`)
+
+Create `deploy/.env.example` as the documented template. Every hostname, port, secret,
+and image tag lives here — nothing is hardcoded in compose or the images.
 
 ```dotenv
 # --- domain / hostnames ---
@@ -199,8 +231,10 @@ OLLAMA_URL=https://ollama.com
 OLLAMA_API_KEY=your-ollama-cloud-key
 ```
 
-Copy to `.env` and fill real values. `openssl rand -base64 64` for `JWT_SECRET`.
-**This file is the only thing that changes between WSL, Proxmox, and AWS.**
+Copy this to `.env` and fill in real values. Generate `JWT_SECRET` with
+`openssl rand -base64 64`.
+
+> **Note:** This file is the only thing that changes between WSL, Proxmox, and AWS.
 
 ---
 
@@ -212,6 +246,8 @@ Cloudflare tunnel — one file, not fragments. Below is a chunk-by-chunk walkthr
 **the complete file is at the end of this section (§6.7)** — copy that.
 
 ### 6.1 Networks — the security spine
+
+Defines the two-tier network split that everything else hangs off:
 ```yaml
 networks:
   edge:                    # web tier: internet-reachable (Traefik, cloudflared, SPAs, backend)
@@ -225,6 +261,8 @@ nothing outside that network can reach them. Only the **backend** joins both tie
 The networks are given explicit names so Traefik can be told exactly which one to use.
 
 ### 6.2 Traefik — LAN entrypoint + TLS
+
+The reverse proxy: terminates TLS and routes by hostname to the right service.
 ```yaml
   traefik:
     image: traefik:v3.1
@@ -248,6 +286,8 @@ on two networks — without it Traefik might try to reach the backend over `data
 fail. TLS via Cloudflare DNS-01 (no inbound port needed to prove ownership).
 
 ### 6.3 cloudflared — public access (optional profile)
+
+The outbound tunnel that exposes the stack to the internet without opening router ports:
 ```yaml
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -262,6 +302,8 @@ go live. In the Cloudflare dashboard, point the tunnel's public hostnames at
 `https://traefik:443` (it shares the `edge` network with Traefik).
 
 ### 6.4 Postgres & MinIO — data tier (no ports, no egress)
+
+The two stateful services, both sealed inside the internal `data` network:
 ```yaml
   postgres:
     image: pgvector/pgvector:pg16
@@ -281,6 +323,8 @@ MinIO console later, add `minio` to `edge` too and give it a Traefik label — d
 publish a host port.
 
 ### 6.5 Backend — the only bridge between tiers
+
+The API service, deliberately attached to both networks:
 ```yaml
   backend:
     build: { context: ../backend }
@@ -299,6 +343,8 @@ Ollama Cloud, mail); `data` lets it reach Postgres and MinIO. This is the single
 deliberate hole between the tiers.
 
 ### 6.6 Storefront & Admin — edge-only SPAs
+
+The two static nginx sites, each routed by Traefik on its own hostname:
 ```yaml
   storefront:
     build: { context: .., dockerfile: frontend/Dockerfile, target: storefront, args: {...} }
@@ -313,6 +359,8 @@ Static nginx images, edge-only — they never touch the data tier (they call the
 over HTTPS like any browser would).
 
 ### 6.7 The complete `deploy/docker-compose.yml`
+
+Save this as `deploy/docker-compose.yml` — it's the assembled version of all the chunks above:
 ```yaml
 name: ecommerce
 
@@ -450,16 +498,19 @@ networks:
     internal: true
 ```
 
-> **Docker-socket note:** mounting `docker.sock` into Traefik is the standard (and
-> convenient) way it discovers services, but it's a privilege. For a hardened setup
-> later, use Traefik's file provider or a socket proxy. Fine for P1.
->
-> **Infra VM (VM2)** gets its own separate `docker-compose.infra.yml` (Harbor, Jenkins,
-> Vault) — different machine, different file. Same network principles apply there.
+> **⚠️ Warning:** Mounting `docker.sock` into Traefik is the standard (and convenient)
+> way it discovers services, but it grants Traefik root-equivalent access to the host.
+> For a hardened setup later, use Traefik's file provider or a socket proxy. Fine for P1.
+
+> **Note:** The infra VM (VM2) gets its own separate `docker-compose.infra.yml` (Harbor,
+> Jenkins, Vault) — different machine, different file. Same network principles apply there.
 
 ---
 
 ## 7. Bring it up + verify
+
+Prepare the config and support directories, then build and start the stack (LAN-only —
+the public tunnel stays off until §10):
 
 ```bash
 cd deploy
@@ -477,22 +528,25 @@ docker compose logs -f backend    # watch Flyway migrate + "KYC OCR ready"
 # docker compose --profile public up -d
 ```
 
-Point DNS at Traefik:
-- **Same-PC access:** add to `C:\Windows\System32\drivers\etc\hosts`:
+Next, point the three hostnames at Traefik. Pick the row that matches how you want to reach it:
+- **Same-PC access:** add this line to `C:\Windows\System32\drivers\etc\hosts`:
   `127.0.0.1 shop.example.com admin.example.com api.example.com`.
-  DNS-01 gave you a *real* cert, so the browser trusts it even pointing at localhost.
+  DNS-01 gave you a *real* cert, so the browser trusts it even when pointing at localhost.
 - **LAN / public:** create Cloudflare DNS records for the three hostnames (see §9/§10).
 
-Check: `https://api.example.com/swagger-ui.html`, `https://shop.example.com`,
-`https://admin.example.com`. Admin login: `admin` / your `ADMIN_BOOTSTRAP_PASSWORD`.
+Finally, verify in a browser:
+- `https://api.example.com/swagger-ui.html`
+- `https://shop.example.com`
+- `https://admin.example.com` — log in with `admin` / your `ADMIN_BOOTSTRAP_PASSWORD`.
 
 ---
 
 ## 8. MinIO wiring (shared object storage)
 
-MinIO is up; two things remain:
+MinIO is up; two things remain.
 
-**a) Create the bucket** (one-time):
+**a) Create the bucket** (one-time). This sets an `mc` alias for the running MinIO and
+makes the media bucket:
 ```bash
 docker compose exec minio sh -c \
   "mc alias set local http://localhost:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD && \
@@ -502,7 +556,7 @@ docker compose exec minio sh -c \
 **b) Point the backend at S3 — IMPLEMENTED, just configure it.**
 The backend now has a `StorageService` abstraction (`service/storage/`) with a
 `local` (default) and an `s3` implementation (AWS SDK v2 `S3AsyncClient`; MinIO speaks
-S3). To use MinIO, set in `.env`:
+S3). To use MinIO, set these in `.env`:
 ```dotenv
 STORAGE_PROVIDER=s3
 S3_ENDPOINT=http://minio:9000
@@ -510,7 +564,7 @@ S3_BUCKET=ecommerce-media
 S3_ACCESS_KEY=${MINIO_ROOT_USER}
 S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
 S3_PATH_STYLE=true
-S3_PUBLIC_BASE_URL=https://media.<domain>   # public serving base for product media
+S3_PUBLIC_BASE_URL=https://media.example.com   # public serving base for product media
 ```
 - **Product media (public)** → stored in the bucket; the media `url` becomes
   `${S3_PUBLIC_BASE_URL}/products/…`. Make that prefix public-read (or front it with a
@@ -521,8 +575,8 @@ S3_PUBLIC_BASE_URL=https://media.<domain>   # public serving base for product me
   read local file paths, so S3 needs a download-to-temp step — a documented follow-up.
   For multi-replica KYC, share that volume (NFS) until then.
 
-> The S3 path is compile-verified but pending a live MinIO smoke test; `local` (default)
-> is unchanged. This is what unblocks running >1 backend replica.
+> **Note:** The S3 path is compile-verified but pending a live MinIO smoke test; `local`
+> (default) is unchanged. This is what unblocks running >1 backend replica.
 
 ---
 
@@ -531,25 +585,32 @@ S3_PUBLIC_BASE_URL=https://media.<domain>   # public serving base for product me
 - Create Cloudflare **DNS A records** `shop`/`admin`/`api` → the VM's LAN IP, set to
   **DNS-only (grey cloud)** so they resolve to the private IP on your network. Certs
   still validate (DNS-01 + wildcard). Now any LAN device reaches the stack over HTTPS.
-- Or run a small local resolver (AdGuard/dnsmasq) mapping `*.<domain>` to the VM IP.
+- Or run a small local resolver (AdGuard/dnsmasq) mapping `*.example.com` to the VM IP.
 
 ---
 
 ## 10. Public access from anywhere — Cloudflare Tunnel (P3)
 
 No router port-forwarding. The `cloudflared` service is **already in the compose file**
-(§6.3) under the `public` profile — you don't add a second one. Bring it up with:
+(§6.3) under the `public` profile — you don't add a second one.
+
+Start the tunnel alongside the already-running stack:
 
 ```bash
 docker compose --profile public up -d      # starts cloudflared alongside the stack
 ```
 
-Steps: Cloudflare Zero Trust → Networks → Tunnels → create tunnel → copy the token
-into `.env` (`CF_TUNNEL_TOKEN`) → add public hostnames in the tunnel UI:
-`shop.<domain>` → `https://traefik:443` (with *No TLS Verify*), same for `admin`/`api`
-(cloudflared reaches Traefik over the shared `edge` network). Then **put
-`admin.<domain>` behind Cloudflare Access** (email OTP / SSO) — layered over the app's
-admin-audience JWT + `/api/admin/**` CORS lock. Turn on the WAF + rate limiting.
+Then configure the tunnel in the Cloudflare dashboard:
+
+1. Cloudflare Zero Trust → Networks → Tunnels → **create tunnel**.
+2. Copy the tunnel token into `.env` as `CF_TUNNEL_TOKEN`.
+3. In the tunnel UI, add public hostnames (cloudflared reaches Traefik over the shared
+   `edge` network):
+   - `shop.example.com` → `https://traefik:443` (with *No TLS Verify*)
+   - same for `admin.example.com` and `api.example.com`.
+4. Put `admin.example.com` behind **Cloudflare Access** (email OTP / SSO) — layered over
+   the app's admin-audience JWT + `/api/admin/**` CORS lock.
+5. Turn on the WAF + rate limiting.
 
 For the deeper networking design (public vs private hostnames, WARP for infra,
 webhook bypass), see [NETWORK_PLAYBOOK.md](NETWORK_PLAYBOOK.md).
@@ -620,7 +681,7 @@ to take read pressure off Postgres entirely.
 - **Backend won't start:** `docker compose logs backend` — usually DB not healthy yet
   (compose waits on the healthcheck) or a bad `.env` value.
 - **Admin 404s on refresh:** confirm `admin.conf` falls back to `/admin.html`.
-- **CORS errors on admin:** `CORS_ADMIN_ORIGINS` must equal `https://admin.<domain>`.
+- **CORS errors on admin:** `CORS_ADMIN_ORIGINS` must equal `https://admin.example.com`.
 - **KYC "OCR unavailable":** `deploy/tessdata/` empty or `KYC_TESSDATA_PATH` wrong.
 
 ---

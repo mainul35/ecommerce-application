@@ -1,19 +1,21 @@
 # Post-Deployment Secrets — Operator Runbook
 
-> **Why this exists.** The repository ships with **placeholder / seed secrets** so the app
-> boots on a fresh developer machine with zero configuration. These defaults are
-> intentionally kept in the codebase for local development and **must never reach a
-> shared, staging, or production environment unchanged.** This document is the checklist
-> for replacing them at deploy time.
->
-> Nothing in the seed data or `application.yml` was removed — the defaults remain for dev.
-> Everything below is about **overriding** them safely in real environments.
+**Purpose.** Replace the repository's dev placeholder/seed secrets with real, vault-managed
+values before any shared, staging, or production deploy. Follow the sections in order:
+inventory → where to store → how to configure → policy → utilization → go-live checklist.
+
+> **⚠️ Warning:** The repo ships with placeholder/seed secrets so the app boots on a fresh
+> dev machine with zero config. These defaults are intentional for local development and
+> **must never reach a shared, staging, or production environment unchanged.**
+
+> **Note:** Nothing in the seed data or `application.yml` was removed — the defaults remain
+> for dev. Everything below is about **overriding** them safely in real environments.
 
 ---
 
 ## 1. Inventory of secrets that MUST be rotated before go-live
 
-Every one of these resolves from an environment variable with a **committed fallback**.
+Every secret below resolves from an environment variable with a **committed fallback**.
 The fallback is fine for `localhost`; it is a takeover risk anywhere else.
 
 | Secret (env var) | Committed default (dev only) | Where it lives | Severity if left as-is |
@@ -27,16 +29,19 @@ The fallback is fine for `localhost`; it is a takeover risk anywhere else.
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | empty (Mailpit, no auth) | `application.yml` → `spring.mail` | MEDIUM |
 | `OLLAMA_URL` | `http://localhost:11434` | `application.yml` → `ollama.url` | LOW (internal service URL) |
 
-> The seed admin (`V2__seed_data.sql`) and the bootstrap admin (`AdminBootstrap.java`) are
-> **left in place on purpose** — they let a developer log in immediately. Section 3 covers
-> how to neutralise them in production without editing the committed files.
+> **Note:** The seed admin (`V2__seed_data.sql`) and the bootstrap admin
+> (`AdminBootstrap.java`) are **left in place on purpose** — they let a developer log in
+> immediately. Section 3 covers how to neutralise them in production without editing the
+> committed files.
 
 ---
 
 ## 2. Where to store the secrets — a secret vault
 
-**Never** put real secrets in `application.yml`, `.env` committed to git, container images,
-or CI logs. Use a managed secret store. Recommended options, in order of preference:
+> **⚠️ Warning:** **Never** put real secrets in `application.yml`, a `.env` committed to
+> git, container images, or CI logs.
+
+Use a managed secret store. Recommended options, in order of preference:
 
 1. **HashiCorp Vault** (self-hosted or HCP) — dynamic DB creds, leasing, and audit.
    Integrate with `spring-cloud-vault` so secrets are pulled at startup into the same
@@ -45,8 +50,10 @@ or CI logs. Use a managed secret store. Recommended options, in order of prefere
    GCP Secret Manager, or Azure Key Vault. Inject at runtime as env vars via the
    platform (ECS task definition `secrets:`, K8s `secretKeyRef`, etc.).
 3. **Kubernetes Secrets sealed with SOPS or Sealed-Secrets** — acceptable if the cluster
-   has encryption-at-rest enabled and RBAC is tight. Plain (unsealed) K8s Secrets are
-   base64, *not* encryption — do not treat them as a vault.
+   has encryption-at-rest enabled and RBAC is tight.
+
+> **⚠️ Warning:** Plain (unsealed) K8s Secrets are base64, *not* encryption — do not treat
+> them as a vault.
 
 **Hard rules**
 
@@ -63,9 +70,11 @@ or CI logs. Use a managed secret store. Recommended options, in order of prefere
 
 The application already reads every secret from an env var with the pattern
 `${ENV_VAR:default}`. So **no code change is required** — you only provide the env vars
-from the vault at runtime. Concretely, per environment:
+from the vault at runtime. Do the following per environment.
 
 ### 3.1 Generate strong values
+
+Generate cryptographically random values to replace the committed placeholders:
 
 ```bash
 # JWT signing key: 256-bit (32-byte) minimum for HS256. Prefer 64 bytes.
@@ -77,6 +86,8 @@ openssl rand -base64 32
 
 ### 3.2 Store them in the vault (example: AWS Secrets Manager)
 
+Write each generated value into the vault under a per-environment name:
+
 ```bash
 aws secretsmanager create-secret --name prod/ecommerce/jwt-secret \
   --secret-string "$(openssl rand -base64 64)"
@@ -87,8 +98,8 @@ aws secretsmanager create-secret --name prod/ecommerce/db-password \
 
 ### 3.3 Inject at runtime (never bake into the image)
 
-Kubernetes example — env sourced from a Secret that an external-secrets operator
-syncs from the vault:
+Map each vault value to the env var the app expects. Kubernetes example — env sourced from
+a Secret that an external-secrets operator syncs from the vault:
 
 ```yaml
 env:
@@ -109,7 +120,8 @@ env:
   vault-managed values on **first** boot. The seeder is idempotent (skips if the email
   exists), so it will create the admin with your strong password, not `admin`/`secret`.
 - **Seed admin (`admin@ecommerce.com` / `admin123`):** it is inserted by Flyway `V2`.
-  Immediately after the first production migration, **rotate or disable it**:
+  Immediately after the first production migration, **rotate or disable it** with one of
+  the statements below:
   ```sql
   -- Option A: disable it entirely and rely on the bootstrap admin.
   UPDATE users SET is_active = false WHERE email = 'admin@ecommerce.com';
@@ -121,10 +133,15 @@ env:
 ### 3.5 Fail-fast guard (recommended follow-up)
 
 Add a startup check (e.g. in a `@PostConstruct` or an `ApplicationRunner` gated on a
-non-`dev` Spring profile) that **refuses to boot** if `JWT_SECRET` still equals the
-committed placeholder or if `ADMIN_BOOTSTRAP_PASSWORD` is `secret`. This converts a silent
-misconfiguration into a loud deploy failure. (Deliberately not enabled by default so local
-dev keeps working with zero config.)
+non-`dev` Spring profile) that **refuses to boot** if:
+
+- `JWT_SECRET` still equals the committed placeholder, or
+- `ADMIN_BOOTSTRAP_PASSWORD` is `secret`.
+
+This converts a silent misconfiguration into a loud deploy failure.
+
+> **Note:** This guard is deliberately not enabled by default so local dev keeps working
+> with zero config.
 
 ---
 
@@ -180,14 +197,20 @@ of a rotation.
 | `ADMIN_BOOTSTRAP_*` | `AdminBootstrap` (first-boot admin seed) | Only read when the admin email does not yet exist. |
 | `OLLAMA_URL` | KYC face-match + semantic search embeddings | If unreachable, KYC routes to manual review and search degrades — non-fatal. |
 
-**Token specifics (post token-hardening):** access tokens are short-lived and carry an
-`aud` (audience) claim of `storefront` or `admin`; the admin API only accepts
-`aud=admin` tokens. Refresh tokens (longer-lived) mint new access tokens via
-`/api/auth/refresh` and `/api/admin/auth/refresh`. Because auth is stateless (signature +
-expiry only), a **leaked token cannot be individually revoked** — the mitigations are the
-short access TTL, rotating `JWT_SECRET`, and disabling the account
-(`users.is_active = false`, which is enforced on every request). A shared-store
-`jti` denylist for true single-token revocation is a recommended future enhancement.
+**Token specifics (post token-hardening):**
+
+- Access tokens are short-lived and carry an `aud` (audience) claim of `storefront` or
+  `admin`; the admin API only accepts `aud=admin` tokens.
+- Refresh tokens (longer-lived) mint new access tokens via `/api/auth/refresh` and
+  `/api/admin/auth/refresh`.
+- Auth is stateless (signature + expiry only), so a **leaked token cannot be individually
+  revoked.** The mitigations are:
+  - the short access TTL,
+  - rotating `JWT_SECRET`, and
+  - disabling the account (`users.is_active = false`, enforced on every request).
+
+> **Tip:** A shared-store `jti` denylist for true single-token revocation is a recommended
+> future enhancement.
 
 ---
 

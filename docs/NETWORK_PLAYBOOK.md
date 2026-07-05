@@ -4,6 +4,12 @@ The end-to-end network path for the whole ecosystem, using a Cloudflare-managed
 domain and **Cloudflare Tunnel** so nothing is exposed by opening router ports.
 Works identically on WSL2, Hyper-V, and Proxmox — only the VM addressing changes.
 
+> **Note:** The Layers are ordered **inside-out** — start at the container network
+> (Layer 1) and work outward to the internet edge (Layer 8). Each Layer opens with
+> a one-line summary of what it does and what you configure there. Throughout,
+> `example.com` is a placeholder for your real domain, and IPs like `10.10.10.0/24`
+> are the example lab addressing.
+
 Companion docs: [DEPLOYMENT_PLAYBOOK.md](DEPLOYMENT_PLAYBOOK.md) (the stack),
 [INFRASTRUCTURE.md](INFRASTRUCTURE.md) (the topology).
 
@@ -35,20 +41,27 @@ Companion docs: [DEPLOYMENT_PLAYBOOK.md](DEPLOYMENT_PLAYBOOK.md) (the stack),
         └───────────────────────────────────────────────────────────┘
 ```
 
-**Key property:** the only connection leaving your network is `cloudflared`
-dialling **out** to Cloudflare. No port-forwarding, no static public IP, no
-inbound firewall holes. Your home IP is never advertised.
+> **Note:** The only connection leaving your network is `cloudflared` dialling
+> **out** to Cloudflare:
+>
+> - No port-forwarding.
+> - No static public IP.
+> - No inbound firewall holes.
+> - Your home IP is never advertised.
 
 ---
 
 ## 1. Layer 1 — container networking (inside each VM)
 
-Segment the Docker networks so the database and secrets are unreachable from the
-web tier, and **only the edge publishes ports**. This is **not a separate compose
-file** — it's the `edge`/`data` split baked into the one
-[`deploy/docker-compose.yml`](DEPLOYMENT_PLAYBOOK.md#6-deploydocker-composeyml) from the
-Deployment Playbook (§6). The full, ready-to-copy file lives there (§6.7); the
-essentials:
+**What this layer does:** segments the Docker networks so the database and secrets
+are unreachable from the web tier, and **only the edge publishes ports**.
+
+This is **not a separate compose file** — it's the `edge`/`data` split baked into
+the one
+[`deploy/docker-compose.yml`](DEPLOYMENT_PLAYBOOK.md#6-deploydocker-composeyml) from
+the Deployment Playbook (§6). The full, ready-to-copy file lives there (§6.7).
+
+The essentials — define the two networks:
 
 ```yaml
 networks:
@@ -58,7 +71,8 @@ networks:
     name: ecommerce_data
     internal: true      # no route to the outside; only same-network containers reach it
 ```
-Service → network attachment (all in that same file):
+Attach each service to its network(s) — all in that same file:
+
 ```yaml
 services:
   cloudflared: { networks: [edge] }         # + profiles: ["public"]
@@ -71,6 +85,7 @@ services:
   # vault:     { networks: [data] }         # add when you introduce Vault (P2+)
 ```
 Rules:
+
 - **Do not** publish host ports (`ports:`) for postgres/vault/minio. They talk to
   the backend over the `data` network by service name (`postgres:5432`).
 - Only Traefik binds host ports (80/443) for LAN access; `cloudflared` needs **no**
@@ -82,9 +97,16 @@ Rules:
 
 ## 2. Layer 2 — inter-VM networking (VM1 ↔ VM2)
 
-Put both VMs on a private network (Proxmox: a Linux bridge / VLAN; Hyper-V: an
-internal or private vSwitch; WSL2: they share the host). Example `10.10.10.0/24`:
-`VM1 = 10.10.10.11`, `VM2 = 10.10.10.12`.
+**What this layer does:** puts both VMs on a private VM↔VM network and opens only
+the specific ports each VM needs from the other.
+
+Create the private network per hypervisor:
+
+- **Proxmox:** a Linux bridge / VLAN.
+- **Hyper-V:** an internal or private vSwitch.
+- **WSL2:** they share the host.
+
+Example addressing on `10.10.10.0/24`: `VM1 = 10.10.10.11`, `VM2 = 10.10.10.12`.
 
 | From → To | Port | Purpose |
 |---|---|---|
@@ -96,6 +118,7 @@ internal or private vSwitch; WSL2: they share the host). Example `10.10.10.0/24`
 | Both VMs → Docker Hub/Maven/npm | 443 outbound | builds/pulls |
 
 Firewall posture per VM:
+
 - **Inbound from internet:** none (default deny).
 - **Inbound from LAN:** only what the table needs; ideally only 443 (Traefik) + SSH.
 - **Inbound from the other VM:** the specific ports above.
@@ -105,23 +128,33 @@ Firewall posture per VM:
 
 ## 3. Layer 3 — host / hypervisor networking
 
+**What this layer does:** determines how each VM reaches the network and whether
+it is reachable from your LAN — which differs per hypervisor but does **not** affect
+public access via the tunnel.
+
 | Host | How VMs/containers get on the net | Reaching from LAN | Notes |
 |---|---|---|---|
 | **WSL2** | NAT behind Windows; `localhost` forwards to Windows | Awkward (needs `netsh portproxy`) | **Doesn't matter** — cloudflared gives public access without LAN reachability. |
 | **Hyper-V** | External vSwitch = bridged (VM gets a LAN IP) | Direct via VM IP | Cleanest for LAN + tunnel. |
 | **Proxmox** | Linux bridge `vmbr0` (bridged) + optional VLANs | Direct via VM IP | Target state; put the lab on its own VLAN/subnet. |
 
-**Insight for WSL2:** you do **not** need to solve WSL2's inbound networking to go
-public. `cloudflared` runs as a container inside WSL2 and makes only *outbound*
-connections, so `https://shop.example.com` works from anywhere even though the WSL2
-VM isn't reachable on your LAN. LAN access (Traefik on `localhost`) is a separate,
-optional convenience via a hosts-file entry.
+> **Tip:** You do **not** need to solve WSL2's inbound networking to go public.
+> `cloudflared` runs as a container inside WSL2 and makes only *outbound*
+> connections, so `https://shop.example.com` works from anywhere even though the
+> WSL2 VM isn't reachable on your LAN. LAN access (Traefik on `localhost`) is a
+> separate, optional convenience via a hosts-file entry.
 
 ---
 
 ## 4. Layer 4 — Cloudflare Tunnel (`cloudflared`)
 
+**What this layer does:** runs the `cloudflared` connector that dials out to
+Cloudflare and carries all public traffic in, so no router ports are ever opened.
+
 ### 4.1 Create the tunnel (once)
+
+Authenticate, create the tunnel, and route each public hostname to it:
+
 ```bash
 cloudflared tunnel login                       # browser auth to your CF account
 cloudflared tunnel create ecommerce            # -> tunnel UUID + credentials json
@@ -132,6 +165,9 @@ cloudflared tunnel route dns ecommerce admin.example.com
 Each `route dns` creates a proxied CNAME `→ <UUID>.cfargotunnel.com` in your zone.
 
 ### 4.2 Run it as a container (VM1)
+
+Add the connector to the compose stack on VM1:
+
 ```yaml
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -165,17 +201,27 @@ Two config styles — pick one:
 
 **Why point at Traefik, not the containers directly?** So all routing, security
 headers, and middleware stay in one place (Traefik) regardless of whether traffic
-arrived via the tunnel or the LAN. `noTLSVerify` is safe here — it's an internal
-Docker-network hop; Cloudflare already did real TLS at the edge.
+arrived via the tunnel or the LAN.
+
+> **Note:** `noTLSVerify` is safe here — it's an internal Docker-network hop, and
+> Cloudflare already did real TLS at the edge.
 
 ### 4.3 Infra VM
-Run a **second** `cloudflared` on VM2 (its own tunnel) for Harbor/Jenkins, **or**
-let VM1's connector reach VM2 over the private net via ingress
-`service: http://10.10.10.12:<port>`. Prefer a per-VM connector for isolation.
+
+Two ways to expose VM2's infra services (Harbor/Jenkins):
+
+- Run a **second** `cloudflared` on VM2 (its own tunnel).
+- **Or** let VM1's connector reach VM2 over the private net via ingress
+  `service: http://10.10.10.12:<port>`.
+
+> **Tip:** Prefer a per-VM connector for isolation.
 
 ---
 
 ## 5. Layer 5 — DNS & hostnames
+
+**What this layer does:** maps each hostname to its exposure (public vs. private),
+its tunnel ingress target, and the protection in front of it.
 
 | Hostname | Exposure | Tunnel ingress → | Protection |
 |---|---|---|---|
@@ -183,35 +229,48 @@ let VM1's connector reach VM2 over the private net via ingress
 | `api.example.com` | **Public** | `https://traefik:443` | app JWT; webhooks are signature-verified |
 | `admin.example.com` | **Public** | `https://traefik:443` | **Cloudflare Access** + admin-audience JWT + CORS |
 | `harbor.example.com` | **Private** | (WARP only) | Zero Trust private route / Access |
-| `jenkins.example.com` | **Private** | (WARP) + webhook bypass | Access + path bypass for GitHub webhook |
+| `jenkins.example.com` | **Private** | (WARP only) + webhook bypass | Access + path bypass for GitHub webhook |
 | `vault.example.com` | **Private** | (WARP only) | never public — WARP only |
 | `minio.example.com` (console) | **Private** | (WARP only) | WARP only |
 
 - Public hostnames = **proxied** (orange cloud) so Cloudflare fronts TLS/WAF.
 - Private infra: **do not** create public DNS. Reach them via **WARP** (§7.2).
-- **Split-horizon (optional, LAN performance):** run a local resolver
-  (AdGuard/dnsmasq) that answers `*.example.com` with the VM's LAN IP so on-LAN
-  traffic hits Traefik directly instead of hair-pinning out to Cloudflare and back.
+
+> **Tip:** **Split-horizon (optional, LAN performance):** run a local resolver
+> (AdGuard/dnsmasq) that answers `*.example.com` with the VM's LAN IP so on-LAN
+> traffic hits Traefik directly instead of hair-pinning out to Cloudflare and back.
 
 ---
 
 ## 6. Layer 6 — TLS end-to-end
 
-Two encrypted hops, no plaintext on any network you don't control:
+**What this layer does:** ensures traffic is encrypted on every hop and sets the
+correct Cloudflare SSL/TLS mode.
+
+The encrypted hops, no plaintext on any network you don't control:
+
 1. **Browser → Cloudflare edge:** Cloudflare's public cert (automatic).
 2. **Cloudflare → cloudflared → Traefik:** the tunnel is encrypted; Traefik then
    presents its **Let's Encrypt DNS-01** cert (from [DEPLOYMENT_PLAYBOOK.md](DEPLOYMENT_PLAYBOOK.md) §5).
 3. **Traefik → app container:** internal Docker network.
 
 Set the Cloudflare zone SSL/TLS mode to **Full (strict)** if Traefik presents a
-publicly-trusted cert (it does, via DNS-01), otherwise **Full**. Never "Flexible".
+publicly-trusted cert (it does, via DNS-01), otherwise **Full**.
+
+> **⚠️ Warning:** Never use "Flexible" SSL/TLS mode.
 
 ---
 
 ## 7. Layer 7 — Cloudflare Access (Zero Trust identity)
 
+**What this layer does:** puts an identity challenge in front of admin and infra
+UIs, and reaches private infra over WARP — while carving out the machine-to-machine
+webhooks that must stay open.
+
 ### 7.1 Protect the admin app and infra UIs (browser)
-Zero Trust → Access → Applications → **Add a self-hosted application**:
+
+In Zero Trust → Access → Applications → **Add a self-hosted application**:
+
 - Application domain: `admin.example.com` (and `harbor.`, `jenkins.` if you expose
   their UIs publicly).
 - Policy: **Allow** where email is in your list / matches your IdP (Google, GitHub,
@@ -222,7 +281,9 @@ This is defense-in-depth **on top of** the app's admin-audience JWT + `/api/admi
 CORS lock — an attacker must pass Cloudflare identity *and* hold a valid admin token.
 
 ### 7.2 Reach private infra (Vault/Harbor/Jenkins) without public DNS — WARP
+
 The clean way to admin infra remotely without exposing it:
+
 1. Zero Trust → Networks → Tunnels → your tunnel → **Private Networks** → add the
    lab CIDR: `10.10.10.0/24` (`cloudflared tunnel route ip add 10.10.10.0/24 ecommerce`).
 2. Install the **Cloudflare WARP** client on your laptop, enroll it in your Zero
@@ -232,20 +293,28 @@ The clean way to admin infra remotely without exposing it:
    posture policy.
 
 ### 7.3 The webhook exception (critical)
+
 Some endpoints are hit by **machines**, not humans, and must NOT sit behind Access:
+
 - **Payment callbacks / webhooks** on `api.example.com`: `/api/webhooks/stripe`,
   `/api/webhooks/omise`, `/api/payment/sslcommerz|paypay|linepay/**`. Keep
   `api.example.com` **public (no Access)** — the app verifies signatures/JWT itself.
 - **GitHub → Jenkins:** if `jenkins.example.com` is behind Access, GitHub can't POST
-  webhooks. Options: (a) an Access **Bypass** policy scoped to `/github-webhook/`
-  validated by the GitHub secret; (b) restrict that path to GitHub's published IP
-  ranges via a WAF rule; or (c) **avoid inbound entirely** — use SCM polling or a
-  GitHub App so Jenkins pulls, needing no public endpoint. (c) is simplest and most
-  secure for a home lab.
+  webhooks. Options:
+  - **(a)** an Access **Bypass** policy scoped to `/github-webhook/` validated by the
+    GitHub secret;
+  - **(b)** restrict that path to GitHub's published IP ranges via a WAF rule;
+  - **(c) avoid inbound entirely** — use SCM polling or a GitHub App so Jenkins pulls,
+    needing no public endpoint.
+
+  > **Tip:** Option (c) is simplest and most secure for a home lab.
 
 ---
 
 ## 8. Layer 8 — WAF, rate limiting, egress
+
+**What this layer does:** adds the Cloudflare edge protections (WAF, rate limiting)
+and tightens VM egress — the outermost layer before the internet.
 
 - **WAF (Cloudflare):** enable managed rules; add a rule to challenge/bad-bot the
   login and checkout paths. Rate-limit `/api/auth/*` and `/api/admin/*`.
@@ -259,6 +328,8 @@ Some endpoints are hit by **machines**, not humans, and must NOT sit behind Acce
 
 ## 9. Phase mapping (what changes as you move)
 
+What changes across deployment phases (P1 → P3), and what stays the same:
+
 | Concern | P1 (WSL2/Hyper-V) | P2 (Proxmox LAN) | P3 (public) |
 |---|---|---|---|
 | VM addressing | NAT / bridged | bridged + VLAN | same as P2 |
@@ -267,8 +338,8 @@ Some endpoints are hit by **machines**, not humans, and must NOT sit behind Acce
 | Infra access | localhost | LAN | WARP private routes |
 | Router changes | **none** | **none** | **none** |
 
-The tunnel means P1 → P3 needs **no router or ISP changes** at any step — you're
-adding Cloudflare policy, not opening ports.
+> **Note:** The tunnel means P1 → P3 needs **no router or ISP changes** at any step
+> — you're adding Cloudflare policy, not opening ports.
 
 ---
 
@@ -288,6 +359,8 @@ adding Cloudflare policy, not opening ports.
 ---
 
 ## 11. Troubleshooting
+
+Common symptoms and their fix (each bullet leads with the symptom):
 
 - **502 via the hostname:** cloudflared can't reach the origin. Check the ingress
   `service:` target resolves on the tunnel's Docker network (`traefik:443`) and that
