@@ -9,7 +9,7 @@ const BACKEND_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8
 );
 
 interface AuthMediaProps {
-  /** Relative URL of the protected file, e.g. /uploads/disputes/{id}/uuid.jpg */
+  /** Relative URL of the party-checked file, e.g. /api/disputes/{id}/attachments/{id}/file */
   url: string;
   type: DisputeAttachmentType;
   alt?: string;

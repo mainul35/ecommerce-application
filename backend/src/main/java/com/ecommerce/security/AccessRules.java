@@ -50,9 +50,14 @@ public class AccessRules {
                 // Admin/manager login surface: public, but UserService.adminLogin rejects
                 // everyone except ADMIN and MANAGER. MUST come before /api/admin/** below.
                 .pathMatchers("/api/admin/auth/**").permitAll()
-                // Dispute evidence is sensitive - require authentication. MUST come
-                // before the public /uploads/** rule below (first match wins).
-                .pathMatchers(HttpMethod.GET, "/uploads/disputes/**").authenticated()
+                // Dispute evidence is sensitive and party-scoped. It is NO LONGER
+                // served statically - files live in a private dir and are streamed
+                // only via the party-checked endpoint
+                // GET /api/disputes/{id}/attachments/{id}/file (DisputeService
+                // #attachmentForViewer). Deny any lingering legacy /uploads/disputes
+                // path outright so nothing is ever served without a party check.
+                // MUST come before the public /uploads/** rule below (first match wins).
+                .pathMatchers("/uploads/disputes/**").denyAll()
                 // Uploaded product photos/videos must be publicly readable for storefront display.
                 .pathMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .pathMatchers(HttpMethod.GET, "/api/products/**").permitAll()

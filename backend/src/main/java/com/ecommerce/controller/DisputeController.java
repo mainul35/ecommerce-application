@@ -3,14 +3,17 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.DisputeCreateRequest;
 import com.ecommerce.dto.DisputeDto;
 import com.ecommerce.dto.DisputeMessageDto;
+import com.ecommerce.service.DisputeMediaService;
 import com.ecommerce.service.DisputeService;
 import com.ecommerce.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -32,6 +35,7 @@ import java.util.UUID;
 public class DisputeController {
 
     private final DisputeService disputeService;
+    private final DisputeMediaService disputeMediaService;
     private final UserService userService;
 
     @PostMapping
@@ -83,6 +87,21 @@ public class DisputeController {
                 .flatMap(user -> safeFiles.collectList()
                         .flatMap((List<FilePart> list) ->
                                 disputeService.addMessage(id, user.getId(), body, list)));
+    }
+
+    @GetMapping("/{disputeId}/attachments/{attachmentId}/file")
+    @Operation(summary = "Stream a dispute evidence file (parties or staff only)")
+    public Mono<ResponseEntity<Flux<DataBuffer>>> attachmentFile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable UUID disputeId,
+            @PathVariable UUID attachmentId) {
+        return userService.findUserEntityByEmail(userDetails.getUsername())
+                .flatMap(user -> disputeService.attachmentForViewer(disputeId, user.getId(), attachmentId))
+                .map(attachment -> ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(
+                                attachment.getContentType() != null
+                                        ? attachment.getContentType() : "application/octet-stream"))
+                        .body(disputeMediaService.read(disputeId, attachment.getFileName())));
     }
 
     @PostMapping("/{id}/escalate")

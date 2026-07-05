@@ -18,6 +18,7 @@ import com.ecommerce.model.WalletTransaction;
 import com.ecommerce.repository.DisputeAttachmentRepository;
 import com.ecommerce.repository.DisputeMessageRepository;
 import com.ecommerce.repository.DisputeRepository;
+import com.ecommerce.repository.OrderItemRepository;
 import com.ecommerce.repository.OrderRepository;
 import com.ecommerce.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,7 @@ public class DisputeService {
     private final DisputeMessageRepository messageRepository;
     private final DisputeAttachmentRepository attachmentRepository;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final UserRepository userRepository;
     private final EscrowService escrowService;
     private final DisputeMediaService disputeMediaService;
@@ -73,6 +75,9 @@ public class DisputeService {
                         .switchIfEmpty(Mono.error(new UnauthorizedException(
                                 "Only the buyer of the order can open a dispute")))
                         .thenReturn(tx))
+                // Integrity: if the buyer names a specific order item, it must belong
+                // to the disputed order - never accept a foreign/arbitrary item id.
+                .flatMap(tx -> validateOrderItem(tx.getOrderId(), orderItemId).thenReturn(tx))
                 .flatMap(tx -> escrowService.markDisputed(tx.getId()))
                 .flatMap(tx -> disputeRepository.save(Dispute.builder()
                         .id(UUID.randomUUID())
@@ -85,6 +90,19 @@ public class DisputeService {
                         .build()))
                 .flatMap(this::toDtoEnriched)
                 .doOnSuccess(d -> log.info("Dispute {} opened on escrow {}", d.getId(), escrowTransactionId));
+    }
+
+    /** Ensure an optionally-supplied order item actually belongs to the order. */
+    private Mono<Void> validateOrderItem(UUID orderId, UUID orderItemId) {
+        if (orderItemId == null) {
+            return Mono.empty();
+        }
+        return orderItemRepository.findById(orderItemId)
+                .switchIfEmpty(Mono.error(new BadRequestException("Order item not found")))
+                .flatMap(item -> orderId.equals(item.getOrderId())
+                        ? Mono.empty()
+                        : Mono.error(new BadRequestException(
+                                "Order item does not belong to the disputed order")));
     }
 
     /**
@@ -168,6 +186,26 @@ public class DisputeService {
                 .concatMap(message -> attachmentRepository.findByDisputeMessageId(message.getId())
                         .collectList()
                         .flatMap(attachments -> toMessageDto(message, attachments)));
+    }
+
+    /**
+     * Authorize and resolve a dispute attachment for streaming. The caller must
+     * be a party to the dispute (buyer, the escrow group's seller, or staff),
+     * AND the attachment must belong to a message of THIS dispute (blocks
+     * cross-dispute id reuse). This replaces the previous static file serving,
+     * which exposed evidence to any authenticated user who knew the URL.
+     * Mirrors the KYC {@code documentForViewer} owner-or-staff check.
+     */
+    public Mono<DisputeAttachment> attachmentForViewer(UUID disputeId, UUID viewerId, UUID attachmentId) {
+        return requireParty(disputeId, viewerId)
+                .flatMap(ctx -> attachmentRepository.findById(attachmentId)
+                        .switchIfEmpty(Mono.error(new ResourceNotFoundException("Attachment not found")))
+                        .flatMap(attachment -> messageRepository.findById(attachment.getDisputeMessageId())
+                                .switchIfEmpty(Mono.error(new ResourceNotFoundException("Attachment not found")))
+                                .flatMap(message -> disputeId.equals(message.getDisputeId())
+                                        ? Mono.just(attachment)
+                                        : Mono.error(new UnauthorizedException(
+                                                "Attachment does not belong to this dispute")))));
     }
 
     // ------------------------------------------------------------------

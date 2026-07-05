@@ -9,7 +9,7 @@ const BACKEND_ORIGIN = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8
 );
 
 interface AdminAuthMediaProps {
-  /** Relative media path served by the backend, e.g. /uploads/disputes/{id}/uuid.jpg */
+  /** Party-checked media path served by the backend, e.g. /api/disputes/{id}/attachments/{id}/file */
   url: string;
   type: DisputeAttachmentType;
   originalName?: string;
