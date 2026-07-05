@@ -44,26 +44,31 @@ inbound firewall holes. Your home IP is never advertised.
 ## 1. Layer 1 — container networking (inside each VM)
 
 Segment the Docker networks so the database and secrets are unreachable from the
-web tier, and **only the edge publishes ports**.
+web tier, and **only the edge publishes ports**. This is **not a separate compose
+file** — it's the `edge`/`data` split baked into the one
+[`deploy/docker-compose.yml`](DEPLOYMENT_PLAYBOOK.md#6-deploydocker-composeyml) from the
+Deployment Playbook (§6). The full, ready-to-copy file lives there (§6.7); the
+essentials:
 
-`deploy/docker-compose.yml` networks:
 ```yaml
 networks:
-  edge:            # web tier - internet-facing via cloudflared/Traefik
-  data:            # DB / secrets / storage - NEVER internet-facing
-    internal: true # no route to the outside; only same-network containers reach it
+  edge:                 # web tier - internet-facing via cloudflared/Traefik
+    name: ecommerce_edge
+  data:                 # DB / secrets / storage - NEVER internet-facing
+    name: ecommerce_data
+    internal: true      # no route to the outside; only same-network containers reach it
 ```
-Attach services:
+Service → network attachment (all in that same file):
 ```yaml
 services:
-  cloudflared: { networks: [edge] }
+  cloudflared: { networks: [edge] }         # + profiles: ["public"]
   traefik:     { networks: [edge] }
   storefront:  { networks: [edge] }
   admin:       { networks: [edge] }
   backend:     { networks: [edge, data] }   # the only bridge between tiers
   postgres:    { networks: [data] }
-  vault:       { networks: [data] }
   minio:       { networks: [data] }
+  # vault:     { networks: [data] }         # add when you introduce Vault (P2+)
 ```
 Rules:
 - **Do not** publish host ports (`ports:`) for postgres/vault/minio. They talk to

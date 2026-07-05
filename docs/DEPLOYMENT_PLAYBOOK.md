@@ -163,6 +163,9 @@ server {
 DOMAIN=example.com
 ACME_EMAIL=you@example.com
 CF_DNS_API_TOKEN=cloudflare-scoped-dns-edit-token
+# Cloudflare Tunnel token (dashboard-managed). Only needed for public exposure
+# (docker compose --profile public up -d). Store in Vault, not git.
+CF_TUNNEL_TOKEN=cloudflare-tunnel-token
 
 # --- frontend build args (baked into the SPA bundles) ---
 VITE_API_BASE_URL=https://api.example.com/api
@@ -203,22 +206,129 @@ Copy to `.env` and fill real values. `openssl rand -base64 64` for `JWT_SECRET`.
 
 ## 6. `deploy/docker-compose.yml`
 
+This is the **single, authoritative compose file** for VM1. It contains the app
+stack, the `edge`/`data` network segmentation (Network Playbook Layer 1), and the
+Cloudflare tunnel — one file, not fragments. Below is a chunk-by-chunk walkthrough;
+**the complete file is at the end of this section (§6.7)** — copy that.
+
+### 6.1 Networks — the security spine
+```yaml
+networks:
+  edge:                    # web tier: internet-reachable (Traefik, cloudflared, SPAs, backend)
+    name: ecommerce_edge
+  data:                    # data tier: NO internet egress, NO host ports
+    name: ecommerce_data
+    internal: true
+```
+`data` is `internal: true`, so Postgres and MinIO have no route to the internet and
+nothing outside that network can reach them. Only the **backend** joins both tiers.
+The networks are given explicit names so Traefik can be told exactly which one to use.
+
+### 6.2 Traefik — LAN entrypoint + TLS
+```yaml
+  traefik:
+    image: traefik:v3.1
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=ecommerce_edge   # reach the multi-homed backend via edge
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --certificatesresolvers.cf.acme.dnschallenge=true
+      - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
+      # …acme email/storage…
+    ports: ["80:80", "443:443"]
+    volumes: ["./traefik:/letsencrypt", "/var/run/docker.sock:/var/run/docker.sock:ro"]
+    networks: [edge]
+```
+The only service that publishes host ports (for LAN access). The
+`--providers.docker.network=ecommerce_edge` line is **required** because `backend` is
+on two networks — without it Traefik might try to reach the backend over `data` and
+fail. TLS via Cloudflare DNS-01 (no inbound port needed to prove ownership).
+
+### 6.3 cloudflared — public access (optional profile)
+```yaml
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment: [TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}]
+    networks: [edge]
+    profiles: ["public"]        # only starts with `docker compose --profile public up -d`
+```
+Publishes **no** ports — it dials *out* to Cloudflare. The `profiles: ["public"]`
+guard means a plain `docker compose up -d` stays LAN-only; add `--profile public` to
+go live. In the Cloudflare dashboard, point the tunnel's public hostnames at
+`https://traefik:443` (it shares the `edge` network with Traefik).
+
+### 6.4 Postgres & MinIO — data tier (no ports, no egress)
+```yaml
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment: { POSTGRES_DB: ${DB_NAME}, POSTGRES_USER: ${DB_USERNAME}, POSTGRES_PASSWORD: ${DB_PASSWORD} }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [data]           # <-- no "ports:" — unreachable from outside the data net
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: ${MINIO_ROOT_USER}, MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD} }
+    volumes: [miniodata:/data]
+    networks: [data]
+```
+Note the **absence of `ports:`** — the whole point. The backend reaches them by
+service name (`postgres:5432`, `minio:9000`) over the `data` network. To browse the
+MinIO console later, add `minio` to `edge` too and give it a Traefik label — don't
+publish a host port.
+
+### 6.5 Backend — the only bridge between tiers
+```yaml
+  backend:
+    build: { context: ../backend }
+    env_file: .env
+    volumes: ["./tessdata:/tessdata:ro"]
+    environment: { KYC_TESSDATA_PATH: /tessdata }
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`api.${DOMAIN}`)
+      - traefik.http.routers.api.tls.certresolver=cf
+      - traefik.http.services.api.loadbalancer.server.port=8080
+    networks: [edge, data]     # edge = ingress + outbound (Stripe/Ollama/SMTP); data = DB/MinIO
+```
+On **both** networks: `edge` gives it Traefik ingress and outbound internet (Stripe,
+Ollama Cloud, mail); `data` lets it reach Postgres and MinIO. This is the single,
+deliberate hole between the tiers.
+
+### 6.6 Storefront & Admin — edge-only SPAs
+```yaml
+  storefront:
+    build: { context: .., dockerfile: frontend/Dockerfile, target: storefront, args: {...} }
+    labels: [ traefik ... Host(`shop.${DOMAIN}`) ... port=80 ]
+    networks: [edge]
+  admin:
+    build: { context: .., dockerfile: frontend/Dockerfile, target: admin, args: {...} }
+    labels: [ traefik ... Host(`admin.${DOMAIN}`) ... port=80 ]
+    networks: [edge]
+```
+Static nginx images, edge-only — they never touch the data tier (they call the API
+over HTTPS like any browser would).
+
+### 6.7 The complete `deploy/docker-compose.yml`
 ```yaml
 name: ecommerce
 
 services:
+  # ── Edge: TLS termination + host-based routing (LAN entrypoint on 80/443) ──
   traefik:
     image: traefik:v3.1
     restart: unless-stopped
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=ecommerce_edge   # reach multi-homed backend via edge
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      # Redirect HTTP -> HTTPS
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      # Cloudflare DNS-01 - no inbound port needed to prove ownership
       - --certificatesresolvers.cf.acme.dnschallenge=true
       - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
       - --certificatesresolvers.cf.acme.email=${ACME_EMAIL}
@@ -230,8 +340,21 @@ services:
       - "443:443"
     volumes:
       - ./traefik:/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock:ro   # see note below
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [edge]
 
+  # ── Edge: outbound-only Cloudflare tunnel (public access; no open router ports) ──
+  # Only starts with `docker compose --profile public up -d`; omit for LAN-only.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    networks: [edge]
+    profiles: ["public"]
+
+  # ── Data: internal only — no host ports, no internet egress ──
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -246,6 +369,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks: [data]
 
   minio:
     image: minio/minio
@@ -256,8 +380,9 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - miniodata:/data
-    # Console only exposed via Traefik if you want it; API is internal.
+    networks: [data]
 
+  # ── App: the ONLY service on both tiers ──
   backend:
     build:
       context: ../backend
@@ -276,7 +401,9 @@ services:
       - traefik.http.routers.api.entrypoints=websecure
       - traefik.http.routers.api.tls.certresolver=cf
       - traefik.http.services.api.loadbalancer.server.port=8080
+    networks: [edge, data]
 
+  # ── Edge: the two SPAs (nginx) ──
   storefront:
     build:
       context: ..
@@ -292,6 +419,7 @@ services:
       - traefik.http.routers.shop.entrypoints=websecure
       - traefik.http.routers.shop.tls.certresolver=cf
       - traefik.http.services.shop.loadbalancer.server.port=80
+    networks: [edge]
 
   admin:
     build:
@@ -308,15 +436,26 @@ services:
       - traefik.http.routers.admin.entrypoints=websecure
       - traefik.http.routers.admin.tls.certresolver=cf
       - traefik.http.services.admin.loadbalancer.server.port=80
+    networks: [edge]
 
 volumes:
   pgdata:
   miniodata:
+
+networks:
+  edge:
+    name: ecommerce_edge
+  data:
+    name: ecommerce_data
+    internal: true
 ```
 
 > **Docker-socket note:** mounting `docker.sock` into Traefik is the standard (and
 > convenient) way it discovers services, but it's a privilege. For a hardened setup
 > later, use Traefik's file provider or a socket proxy. Fine for P1.
+>
+> **Infra VM (VM2)** gets its own separate `docker-compose.infra.yml` (Harbor, Jenkins,
+> Vault) — different machine, different file. Same network principles apply there.
 
 ---
 
@@ -330,9 +469,12 @@ mkdir -p tessdata traefik nginx
 touch traefik/acme.json && chmod 600 traefik/acme.json
 
 docker compose build
-docker compose up -d
+docker compose up -d              # LAN-only (cloudflared stays off — it's in the "public" profile)
 docker compose ps
 docker compose logs -f backend    # watch Flyway migrate + "KYC OCR ready"
+
+# When ready to expose publicly, add the tunnel (§10):
+# docker compose --profile public up -d
 ```
 
 Point DNS at Traefik:
@@ -395,23 +537,22 @@ S3_PUBLIC_BASE_URL=https://media.<domain>   # public serving base for product me
 
 ## 10. Public access from anywhere — Cloudflare Tunnel (P3)
 
-No router port-forwarding. Add a `cloudflared` container that dials **out** to
-Cloudflare:
+No router port-forwarding. The `cloudflared` service is **already in the compose file**
+(§6.3) under the `public` profile — you don't add a second one. Bring it up with:
 
-```yaml
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    command: tunnel run
-    environment:
-      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+```bash
+docker compose --profile public up -d      # starts cloudflared alongside the stack
 ```
 
 Steps: Cloudflare Zero Trust → Networks → Tunnels → create tunnel → copy the token
 into `.env` (`CF_TUNNEL_TOKEN`) → add public hostnames in the tunnel UI:
-`shop.<domain>` → `http://traefik:80`, same for `admin`/`api`. Then **put
+`shop.<domain>` → `https://traefik:443` (with *No TLS Verify*), same for `admin`/`api`
+(cloudflared reaches Traefik over the shared `edge` network). Then **put
 `admin.<domain>` behind Cloudflare Access** (email OTP / SSO) — layered over the app's
 admin-audience JWT + `/api/admin/**` CORS lock. Turn on the WAF + rate limiting.
+
+For the deeper networking design (public vs private hostnames, WARP for infra,
+webhook bypass), see [NETWORK_PLAYBOOK.md](NETWORK_PLAYBOOK.md).
 
 ---
 
