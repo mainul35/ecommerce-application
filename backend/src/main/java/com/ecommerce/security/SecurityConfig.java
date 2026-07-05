@@ -40,6 +40,9 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins}")
     private String allowedOrigins;
 
+    @Value("${cors.admin-origins}")
+    private String adminOrigins;
+
     @Value("${cors.allowed-methods}")
     private String allowedMethods;
 
@@ -53,16 +56,23 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Admin API: only the standalone admin dashboard origin. Registered FIRST
+        // so it takes precedence over the general rule for /api/admin/** paths.
+        source.registerCorsConfiguration("/api/admin/**", corsConfig(adminOrigins));
+        // Everything else: storefront + admin origins (public endpoints are shared).
+        source.registerCorsConfiguration("/**", corsConfig(allowedOrigins));
+        return source;
+    }
+
+    private CorsConfiguration corsConfig(String origins) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+        configuration.setAllowedOrigins(Arrays.asList(origins.split(",")));
         configuration.setAllowedMethods(Arrays.asList(allowedMethods.split(",")));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(allowCredentials);
         configuration.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+        return configuration;
     }
 
     @Bean

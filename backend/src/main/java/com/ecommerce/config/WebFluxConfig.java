@@ -17,6 +17,9 @@ public class WebFluxConfig implements WebFluxConfigurer {
     @Value("${cors.allowed-origins}")
     private String allowedOrigins;
 
+    @Value("${cors.admin-origins}")
+    private String adminOrigins;
+
     @Value("${cors.allowed-methods}")
     private String allowedMethods;
 
@@ -31,6 +34,14 @@ public class WebFluxConfig implements WebFluxConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        // Admin API restricted to the standalone admin dashboard origin. Declared
+        // BEFORE the general /api/** mapping so it wins for /api/admin/** paths.
+        registry.addMapping("/api/admin/**")
+                .allowedOrigins(adminOrigins.split(","))
+                .allowedMethods(allowedMethods.split(","))
+                .allowedHeaders(allowedHeaders.split(","))
+                .allowCredentials(allowCredentials)
+                .maxAge(3600);
         registry.addMapping("/api/**")
                 .allowedOrigins(allowedOrigins.split(","))
                 .allowedMethods(allowedMethods.split(","))

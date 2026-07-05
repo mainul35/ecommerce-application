@@ -7,6 +7,11 @@ import { canAccessAdmin } from '../../routes/permissions';
 import { CurrencyPicker } from '../../storefront/CurrencyPicker';
 import { RegionSelector } from '../../storefront/RegionSelector';
 
+// The admin console is a SEPARATE application on its own origin (default :5174 in
+// dev). Link to it as a full-page navigation, not a client-side route - the
+// storefront app has no admin routes. Configure the real URL via VITE_ADMIN_URL.
+const ADMIN_URL = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174/admin';
+
 export function Navbar() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -160,9 +165,9 @@ export function Navbar() {
                         <hr className="dropdown-divider" />
                       </li>
                       <li>
-                        <Link className="dropdown-item text-primary fw-semibold" to="/admin">
+                        <a className="dropdown-item text-primary fw-semibold" href={ADMIN_URL}>
                           Admin Console
-                        </Link>
+                        </a>
                       </li>
                     </>
                   )}
