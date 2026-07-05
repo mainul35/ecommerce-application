@@ -9,8 +9,10 @@
 ## Build & Run
 
 ```bash
-# Frontend
-npm install && npm run dev
+# Frontend — two SEPARATE apps (isolated origins/ports):
+npm install
+npm run dev          # storefront  -> http://localhost:5173
+npm run dev:admin    # admin console -> http://localhost:5174 (independent server)
 
 # Backend
 ./mvnw spring-boot:run
@@ -19,6 +21,11 @@ npm install && npm run dev
 npm test          # frontend
 ./mvnw test       # backend
 ```
+
+The admin dashboard is a standalone app (`admin.html` / `src/admin-main.tsx`,
+`vite.admin.config.ts`) that cannot be reached from the storefront. The backend
+restricts `/api/admin/**` to the admin origin via CORS and rejects non-admin-
+audience tokens. Secrets: see [docs/POST_DEPLOYMENT_SECRETS.md](docs/POST_DEPLOYMENT_SECRETS.md).
 
 ## Rules
 
