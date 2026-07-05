@@ -2,6 +2,7 @@ package com.ecommerce.admin.controller;
 
 import com.ecommerce.dto.auth.AuthResponse;
 import com.ecommerce.dto.auth.LoginRequest;
+import com.ecommerce.dto.auth.RefreshRequest;
 import com.ecommerce.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,5 +35,11 @@ public class AdminAuthController {
     @Operation(summary = "Admin login (rejects non-admin accounts)")
     public Mono<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return userService.adminLogin(request);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Exchange an admin refresh token for a new access token")
+    public Mono<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return userService.refreshAdmin(request.getRefreshToken());
     }
 }

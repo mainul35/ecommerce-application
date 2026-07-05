@@ -3,6 +3,20 @@ import type { AuthState, LoginRequest, RegisterRequest, AuthResponse, User } fro
 import { authService } from '../../services/authService';
 import { adminAuthService } from '../../services/admin/adminAuthService';
 
+/** Persist the access token and (short-lived-access → long-lived-refresh) pair. */
+function persistTokens(response: AuthResponse) {
+  localStorage.setItem('token', response.token);
+  if (response.refreshToken) {
+    localStorage.setItem('refreshToken', response.refreshToken);
+  }
+}
+
+/** Clear both tokens on logout / session invalidation. */
+function clearTokens() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+}
+
 const initialState: AuthState = {
   user: null,
   token: localStorage.getItem('token'),
@@ -16,7 +30,7 @@ export const login = createAsyncThunk<AuthResponse, LoginRequest>(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await authService.login(credentials);
-      localStorage.setItem('token', response.token);
+      persistTokens(response);
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
@@ -30,7 +44,7 @@ export const adminLogin = createAsyncThunk<AuthResponse, LoginRequest>(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await adminAuthService.login(credentials);
-      localStorage.setItem('token', response.token);
+      persistTokens(response);
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
@@ -44,7 +58,7 @@ export const register = createAsyncThunk<AuthResponse, RegisterRequest>(
   async (userData, { rejectWithValue }) => {
     try {
       const response = await authService.register(userData);
-      localStorage.setItem('token', response.token);
+      persistTokens(response);
       return response;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Registration failed';
@@ -75,7 +89,7 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       state.error = null;
-      localStorage.removeItem('token');
+      clearTokens();
     },
     clearError: (state) => {
       state.error = null;
@@ -146,7 +160,7 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         state.token = null;
         state.isAuthenticated = false;
-        localStorage.removeItem('token');
+        clearTokens();
       });
   },
 });

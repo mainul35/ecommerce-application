@@ -3,6 +3,7 @@ package com.ecommerce.controller;
 import com.ecommerce.dto.UserDto;
 import com.ecommerce.dto.auth.AuthResponse;
 import com.ecommerce.dto.auth.LoginRequest;
+import com.ecommerce.dto.auth.RefreshRequest;
 import com.ecommerce.dto.auth.RegisterRequest;
 import com.ecommerce.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +35,12 @@ public class AuthController {
     @Operation(summary = "Login with email and password")
     public Mono<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return userService.login(request);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Exchange a storefront refresh token for a new access token")
+    public Mono<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return userService.refreshStorefront(request.getRefreshToken());
     }
 
     @GetMapping("/me")

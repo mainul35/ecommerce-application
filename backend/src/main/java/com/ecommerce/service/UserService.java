@@ -49,20 +49,19 @@ public class UserService {
                                     .onErrorResume(e -> Mono.empty())
                                     .thenReturn(saved));
                 })
-                .map(user -> AuthResponse.builder()
-                        .user(userMapper.toDto(user))
-                        .token(jwtTokenProvider.generateToken(user))
-                        .build());
+                // Registration is a storefront action - mint storefront-scoped tokens.
+                .map(user -> buildAuthResponse(user, JwtTokenProvider.Audience.STOREFRONT));
     }
 
     /**
      * Customer-side login. Accepts CUSTOMER and VENDOR accounts - sellers
      * are storefront users too. Rejects ADMIN/MANAGER with a generic
      * {@code Invalid credentials} message - staff MUST use the admin login flow.
+     * Issues STOREFRONT-audience tokens.
      */
     public Mono<AuthResponse> login(LoginRequest request) {
-        return authenticate(request, role -> role == User.UserRole.CUSTOMER
-                || role == User.UserRole.VENDOR);
+        return authenticate(request, JwtTokenProvider.Audience.STOREFRONT,
+                role -> role == User.UserRole.CUSTOMER || role == User.UserRole.VENDOR);
     }
 
     /**
@@ -70,14 +69,27 @@ public class UserService {
      * share the same login surface but see different sidebars / route
      * permissions once inside. Rejects everyone else with the same generic
      * message (no information leak about whether the account exists or
-     * is a customer).
+     * is a customer). Issues ADMIN-audience tokens, which are the only tokens
+     * the admin API will accept.
      */
     public Mono<AuthResponse> adminLogin(LoginRequest request) {
-        return authenticate(request,
+        return authenticate(request, JwtTokenProvider.Audience.ADMIN,
                 role -> role == User.UserRole.ADMIN || role == User.UserRole.MANAGER);
     }
 
-    private Mono<AuthResponse> authenticate(LoginRequest request,
+    /** Exchange a storefront refresh token for a fresh storefront token pair. */
+    public Mono<AuthResponse> refreshStorefront(String refreshToken) {
+        return refresh(refreshToken, JwtTokenProvider.Audience.STOREFRONT,
+                role -> role == User.UserRole.CUSTOMER || role == User.UserRole.VENDOR);
+    }
+
+    /** Exchange an admin refresh token for a fresh admin token pair. */
+    public Mono<AuthResponse> refreshAdmin(String refreshToken) {
+        return refresh(refreshToken, JwtTokenProvider.Audience.ADMIN,
+                role -> role == User.UserRole.ADMIN || role == User.UserRole.MANAGER);
+    }
+
+    private Mono<AuthResponse> authenticate(LoginRequest request, JwtTokenProvider.Audience audience,
                                             java.util.function.Predicate<User.UserRole> roleAllowed) {
         return userRepository.findByEmail(request.getEmail())
                 .switchIfEmpty(Mono.error(new UnauthorizedException("Invalid credentials")))
@@ -89,11 +101,40 @@ public class UserService {
                     if (!user.getIsActive()) {
                         return Mono.error(new UnauthorizedException("Account is disabled"));
                     }
-                    return Mono.just(AuthResponse.builder()
-                            .user(userMapper.toDto(user))
-                            .token(jwtTokenProvider.generateToken(user))
-                            .build());
+                    return Mono.just(buildAuthResponse(user, audience));
                 });
+    }
+
+    /**
+     * Validate a refresh token for the given surface and mint a fresh token pair
+     * (rotation). Rejects anything that is not a valid, matching-audience refresh
+     * token, or whose account is no longer allowed on that surface / is disabled.
+     */
+    private Mono<AuthResponse> refresh(String refreshToken, JwtTokenProvider.Audience audience,
+                                       java.util.function.Predicate<User.UserRole> roleAllowed) {
+        if (refreshToken == null
+                || !jwtTokenProvider.validateToken(refreshToken)
+                || !jwtTokenProvider.isRefreshToken(refreshToken)
+                || jwtTokenProvider.getAudience(refreshToken) != audience) {
+            return Mono.error(new UnauthorizedException("Invalid refresh token"));
+        }
+        String email = jwtTokenProvider.getEmailFromToken(refreshToken);
+        return userRepository.findByEmail(email)
+                .switchIfEmpty(Mono.error(new UnauthorizedException("Invalid refresh token")))
+                .flatMap(user -> {
+                    if (!roleAllowed.test(user.getRole()) || !user.getIsActive()) {
+                        return Mono.error(new UnauthorizedException("Invalid refresh token"));
+                    }
+                    return Mono.just(buildAuthResponse(user, audience));
+                });
+    }
+
+    private AuthResponse buildAuthResponse(User user, JwtTokenProvider.Audience audience) {
+        return AuthResponse.builder()
+                .user(userMapper.toDto(user))
+                .token(jwtTokenProvider.generateAccessToken(user, audience))
+                .refreshToken(jwtTokenProvider.generateRefreshToken(user, audience))
+                .build();
     }
 
     public Mono<UserDto> findById(UUID id) {
