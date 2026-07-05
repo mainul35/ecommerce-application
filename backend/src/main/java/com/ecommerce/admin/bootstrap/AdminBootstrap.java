@@ -20,6 +20,15 @@ import java.util.UUID;
  * Credentials are read from configuration so production deployments can
  * override via env vars (ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_PASSWORD).
  *
+ * SECURITY: the built-in defaults ({@code admin}/{@code secret}) exist only so a
+ * fresh dev machine has an admin to log in with. They are guessable and MUST be
+ * overridden in any shared environment (see docs/POST_DEPLOYMENT_SECRETS.md).
+ * Two guards enforce this without breaking local dev:
+ *   - set {@code admin.bootstrap.enabled=false} in production to disable the
+ *     fallback seed entirely (rely on the vault-provisioned / rotated admin);
+ *   - if the default password is still in use, a prominent WARN is logged on
+ *     every boot so a misconfiguration cannot pass unnoticed.
+ *
  * subscribe() is used here because this is application-bootstrap code, not
  * request-handling code. There is no upstream reactor pipeline to compose
  * with; the chain must be terminated to fire.
@@ -29,8 +38,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminBootstrap implements ApplicationRunner {
 
+    /** The insecure built-in default - flagged loudly whenever it is in effect. */
+    private static final String DEFAULT_PASSWORD = "secret";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${admin.bootstrap.enabled:true}")
+    private boolean bootstrapEnabled;
 
     @Value("${admin.bootstrap.email:admin}")
     private String adminEmail;
@@ -46,6 +61,15 @@ public class AdminBootstrap implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!bootstrapEnabled) {
+            log.info("Admin bootstrap disabled (admin.bootstrap.enabled=false) - no fallback admin seeded");
+            return;
+        }
+        if (DEFAULT_PASSWORD.equals(adminPassword)) {
+            log.warn("SECURITY: admin bootstrap is using the default password '{}'. Set "
+                    + "ADMIN_BOOTSTRAP_PASSWORD to a strong value (or admin.bootstrap.enabled=false) "
+                    + "before exposing this deployment. See docs/POST_DEPLOYMENT_SECRETS.md", DEFAULT_PASSWORD);
+        }
         userRepository.existsByEmail(adminEmail)
                 .flatMap(exists -> {
                     if (Boolean.TRUE.equals(exists)) {
